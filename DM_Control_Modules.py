@@ -2,6 +2,7 @@ import time
 import numpy as np
 import ctypes
 import os.path
+
 os.add_dll_directory(os.getcwd())
 current_script_path = os.path.abspath(__file__)
 current_directory = os.path.dirname(current_script_path)
@@ -10,7 +11,7 @@ import multiprocessing as mp
 
 RAN = 0.25
 DOF = 57
-SN = 'BAX758'
+SN = "BAX758"
 ZERN_to_VOLT_MATRIX_PATH = f"Data_Deposit/range_{RAN}_zernike_to_voltage.npy"
 
 
@@ -25,9 +26,11 @@ def alpao_loop_single(sequence_raw, stop_raw):
     stop = np.frombuffer(stop_raw, dtype="uint32")
     sequence = np.frombuffer(sequence_raw, dtype="float64")
     if np.any(sequence > 1):
-        print('Voltages have elements larger than 1!')
+        print('Voltages contain element(s) larger than 1!')
+    elif np.nan in sequence:
+        print('Voltages contain nan element(s)')
 
-    # c=0
+    c=0
 
     while stop[0]==0:
         output=lib.asdkSendPattern(asdk_dm,
@@ -37,19 +40,21 @@ def alpao_loop_single(sequence_raw, stop_raw):
         if output!=0:
             lib.asdkPrintLastError()
 
-        # c+=1
+        c+=1
 
     lib.asdkRelease(asdk_dm)
 
-def alpao_loop_sequence(sequence_raw, length_raw, repeats_raw, stop_raw, trigger_in=0):
+def alpao_loop_sequence(sequence_raw, length_raw, repeats_raw, stop_raw, trigger_in = 0):
 
     length = np.frombuffer(length_raw, dtype="uint32")
-    print(length.size)
+    # print(length.size)
     repeats = np.frombuffer(repeats_raw, dtype="uint32")
     stop = np.frombuffer(stop_raw, dtype="uint32")
     sequence = np.frombuffer(sequence_raw, dtype="float64").reshape((length[0], DOF))
     if np.any(sequence > 1):
         print('Voltages have elements larger than 1!')
+    elif np.nan in sequence:
+        print('Voltages contain nan element(s)')
     lib = ctypes.cdll.LoadLibrary('Lib64/ASDK.dll')
     lib.asdkInit.restype = ctypes.POINTER(ctypes.c_void_p)
     asdk_dm = lib.asdkInit(SN.encode("utf-8"))
@@ -84,6 +89,7 @@ class AlPaoDM:
         self.stop = None
         self.repeat = None
         self.AlPao_process = None
+        self.checker = None
         if os.path.isfile("Data_Deposit/zeroing_compensation_voltage.npy"):
             self.zero_compensation_voltage = np.array(np.load("Data_Deposit/zeroing_compensation_voltage.npy")).T
         else:
@@ -103,13 +109,14 @@ class AlPaoDM:
 
     def send_voltage_patterns(self, voltages, repeat, trigger = 0):
         voltages += self.zero_compensation_voltage
+        # self.checker = voltages[:, 100]
         # self.patterns_raw = mp.RawArray("d", voltages.shape[0]*DOF*np.dtype("float64").itemsize)
-        self.patterns_raw = mp.RawArray("d", voltages.shape[1]*DOF)
+        self.patterns_raw = mp.RawArray("d", DOF * voltages.shape[1])
         self.length_raw = mp.RawArray("I", 1)
         self.repeat_raw = mp.RawArray("I", 1)
         self.stop_raw = mp.RawArray("I", 1)
-        self.patterns = np.frombuffer(self.patterns_raw).reshape((DOF, voltages.shape[1]))
-        self.patterns[:, :] = voltages
+        self.patterns = np.frombuffer(self.patterns_raw).reshape((voltages.shape[1], DOF))
+        self.patterns[:, :] = np.array(voltages).T
         self.length = np.frombuffer(self.length_raw, dtype = 'uint32')
         self.stop = np.frombuffer(self.stop_raw, dtype = 'uint32')
         self.repeat = np.frombuffer(self.repeat_raw, dtype = 'uint32')
@@ -121,11 +128,11 @@ class AlPaoDM:
         self.process.start()
 
     def update_pattern_voltages(self, voltages):
-        self.patterns[:,:] = voltages + self.zero_compensation_voltage
+        self.patterns[:,:] = np.array(voltages + self.zero_compensation_voltage).T
 
     def update_zernike_patterns(self, zernike_orders):
         voltages = np.einsum('ij, ik -> jk', self.zern_to_volt, zernike_orders)
-        self.patterns[:, :] = voltages
+        self.patterns[:, :] = np.array(voltages).T
 
     def start_direct_control(self):
         self.patterns_raw = mp.RawArray('d', DOF)
@@ -138,11 +145,11 @@ class AlPaoDM:
         self.process.start()
 
     def send_direct_voltage(self, voltages):
-        self.patterns = voltages + self.zero_compensation_voltage
+        self.patterns = np.array(voltages + self.zero_compensation_voltage).T
 
     def send_direct_zernike(self, zernike_orders):
         voltages = np.einsum('ij, ik -> jk', self.zern_to_volt, zernike_orders)
-        self.patterns[:, :] = voltages
+        self.patterns[:, :] = np.array(voltages).T
 
     def stop_loop(self):
         if self.stop is not None:
@@ -151,12 +158,14 @@ class AlPaoDM:
 # Dynamic zernike patterns for testing
 if __name__ == '__main__':
     time.sleep(0.05)
-    seq_length = 20000
+    seq_length = 1000
     seq = np.zeros((27, seq_length))
-    defocus_amp = np.sin(np.linspace(0, 2*np.pi, seq_length))
-    seq[2, :] = defocus_amp
+    test_amp_1 = np.sin(np.linspace(0, 2*np.pi, seq_length))
+    test_amp_2 = np.cos(np.linspace(0, 2*np.pi, seq_length))
+    seq[0, :] = test_amp_1
+    seq[1, :] = test_amp_2
     DM = AlPaoDM()
     DM.send_zernike_patterns(seq, repeat = 0)
-    time.sleep(2)
+    time.sleep(4)
+    input()
     DM.stop_loop()
-
