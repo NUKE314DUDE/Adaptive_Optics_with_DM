@@ -1,8 +1,35 @@
 import time
+import threading
+from multiprocessing.sharedctypes import RawArray
 import numpy as np
 from hamamatsu.dcam import dcam, copy_frame, Stream
+import matplotlib.pyplot as plt
 
-## credit to Vipin Balan %%
+## credit to Vipin Balan ##
+
+stop_live = False
+
+def stop_live_thread():
+    global stop_live
+    while 1:
+        key = input()
+        if key == 'x':
+            print('Stopping Camera live...')
+            stop_live = True
+            main_cam.stop_live()
+            main_cam.camera_close()
+            break
+
+def live_feed_thread(cam, img):
+    global stop_live
+    while not stop_live:
+        try:
+            frame = cam.get_last_live_frame()
+            if frame is not None:
+                img[:, :] = frame[:]
+        except Exception as e:
+            print(f"Error in get last live frame: {e}")
+
 class mainCamera:
     def __init__(self):
         self.number_of_frames = None
@@ -31,13 +58,13 @@ class mainCamera:
             print(f"Error in camera close: {e}")
 
     def set_all_parameters(self,sensor_mode = 1.0,
-                           exposure_time = 1e-4,
+                           exposure_time = 1e-3,
                            trigger_source = 1,
                            subarray_mode = 2,
                            h_size = 2304, v_size = 2304,
                            trigger_delay = 0,
                            trigger_polarity = 1,
-                           internal_line_interval = 5e-6,
+                           internal_line_interval = 10e-6,
                            subarray_hpos = 0, subarray_vpos = 0,
                            readout_speed = 1, parameter = None, value = None):
         try:
@@ -47,7 +74,7 @@ class mainCamera:
             self.camera["readout_speed"] = readout_speed
             self.camera["exposure_time"] = exposure_time
             self.camera["trigger_source"] = trigger_source  #1
-            self.camera["trigger_polarity"] = trigger_polarity  # 1
+            self.camera["trigger_polarity"] = trigger_polarity  #1
             self.camera["subarray_mode"] = 1    #2
             self.camera["subarray_hsize"] = h_size
             self.camera["subarray_vsize"] = v_size
@@ -122,7 +149,7 @@ class mainCamera:
     def get_last_live_frame(self):
         try:
             while self.stream.event_stream.__next__()==0:
-                time.sleep(0.0001)
+                time.sleep(0.00001)
 
             current_frame_idx = next(self.tstream).nNewestFrameIndex
             while current_frame_idx == self.last_frame_idx:
@@ -137,7 +164,7 @@ class mainCamera:
     def get_last_sequence_frame(self):
         try:
             while self.stream.event_stream.__next__()==0:
-                time.sleep(0.0001)
+                time.sleep(0.00001)
             current_frame_idx = next(self.tstream).nNewestFrameIndex
             while current_frame_idx == self.last_frame_idx:
                 time.sleep(0.001)
@@ -160,14 +187,45 @@ class mainCamera:
             print(f"Error in stop live: {e}")
 
 if __name__ == "__main__":
+
+    CAM_SIZE = 2304
+    IMAG_SIZE = (CAM_SIZE, 480)
+    image_16Raw = RawArray('H', IMAG_SIZE[0] * IMAG_SIZE[1])
     main_cam = mainCamera()
     main_cam.camera_open()
-    main_cam.set_all_parameters(sensor_mode=12,
-                                trigger_polarity=2)
-    main_cam.set_single_parameter("readout_direction", 1)
-    main_cam.set_single_parameter("trigger_source", 1)
-    for par in main_cam.camera:
-        if "enum_values" in main_cam.camera[par].keys():
-            print(main_cam.camera[par]["uname"],main_cam.camera[par]['enum_values'],main_cam.camera[par]['default_value'])
-        else:
-            print(main_cam.camera[par]["uname"],main_cam.camera[par]['min_value'],main_cam.camera[par]['max_value'],main_cam.camera[par]['default_value'])
+    image_16 = np.frombuffer(image_16Raw, dtype='uint16').reshape(IMAG_SIZE)
+    main_cam.set_single_parameter("subarray_mode", 2)
+    main_cam.set_single_parameter("subarray_hsize", IMAG_SIZE[0])
+    main_cam.set_single_parameter("subarray_vsize", IMAG_SIZE[1])
+    main_cam.set_single_parameter("subarray_hpos", int((CAM_SIZE/2 - IMAG_SIZE[0]/2)))
+    main_cam.set_single_parameter("subarray_vpos", int((CAM_SIZE/2 - IMAG_SIZE[1]/2)))
+    main_cam.set_single_parameter("sensor_mode", 12.0)
+    main_cam.set_single_parameter("exposure_time", 10.0)
+
+    main_cam.start_live()
+
+    test_img = main_cam.get_last_live_frame()
+    if test_img is None: print('Check camera setting!')
+
+    stop_thread = threading.Thread(target=stop_live_thread)
+    stop_thread.daemon = True
+    stop_thread.start()
+
+    live_feed = threading.Thread(target=live_feed_thread, args=(main_cam, image_16))
+    live_feed.daemon = True
+    live_feed.start()
+
+    plt.ion()
+    fig, ax = plt.subplots()
+    live_img = ax.imshow(image_16, cmap='gray', vmin=0, vmax = 40000)
+
+    try:
+        while 1:
+            live_img.set_data(image_16.astype("float"))
+            fig.canvas.flush_events()
+            time.sleep(0.001)
+    except KeyboardInterrupt:
+        print('User input interrupt...')
+
+    plt.ioff()
+    plt.show()
