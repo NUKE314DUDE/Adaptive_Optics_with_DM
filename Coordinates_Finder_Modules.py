@@ -348,7 +348,7 @@ def precise_coord_fixed_ref(image, refined_ref_coord, cog_scale = 0.5):
     cog_coord = center_of_gravity_with_coord(pre_processed_img, refined_ref_coord, cog_scale)
     return cog_coord
 
-def deformable_mirror_random_test_input(test_range, test_length, degree_of_freedom = 69, sym = False):
+def deformable_mirror_random_test_input(test_range, test_length, degree_of_freedom = 57, sym = False):
     """
     Generate random voltages for testing the probed matrix
     :param sym: chose to add minus input or not
@@ -363,7 +363,7 @@ def deformable_mirror_random_test_input(test_range, test_length, degree_of_freed
         input_matrix = np.random.uniform(0, test_range, (test_length, degree_of_freedom))
     return input_matrix
 
-def deformable_mirror_single_probe_input(probe_ran, degree_of_freedom = 69):
+def deformable_mirror_single_probe_input(probe_ran, degree_of_freedom = 57):
     """
     Generate scan voltage set
     :param probe_ran:
