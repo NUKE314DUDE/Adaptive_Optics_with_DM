@@ -12,8 +12,8 @@ def show_profile(profile, X, Y):
     :param Y: y dim grid
     :return: a plot of the profile using X, Y as the grid
     """
-    fig, ax = plt.subplots()
     plt.ion()
+    fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     ax.plot_surface(X, Y, profile, cmap="viridis")
     plt.show()
