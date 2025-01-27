@@ -1,7 +1,25 @@
 import numpy as np
 from scipy import signal
 from Zernike_Polynomials_Modules import min_circle
-from Coordinates_Finder_Modules import coord_diff
+from Coordinates_Finder_Modules import coord_diff, closest_to_center
+
+def path_integration(px, py, start = (0, 0)):
+    """
+    Integrate along row then col from starting point
+    :param px: gradient X
+    :param py: gradient Y
+    :param start: starting point
+    :return: path integration result
+    """
+    M, N = px.shape
+    path_x = np.arange(start[1], M)
+    path_y = np.arange(start[0], N)
+    ref_height = 0
+    for i in path_x:
+        ref_height += px[i, start[1]]
+    for j in path_y:
+        ref_height += py[path_x[-1], j]
+    return ref_height, start
 
 def frankot_chellappa(px, py):
     """
