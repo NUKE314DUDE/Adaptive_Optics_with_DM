@@ -94,7 +94,7 @@ def img_threshold(image, intensity_threshold = 30):
     :param intensity_threshold: minimum pixel value
     :return: filtered image
     """
-    filtered_img = np.where(image > intensity_threshold, image, 1e-6)
+    filtered_img = np.where(np.abs(image) > intensity_threshold, image, 1e-6)
     return filtered_img
 
 def show_coord(image, coord, circle = None):
@@ -375,8 +375,8 @@ def deformable_mirror_single_probe_input(probe_ran, degree_of_freedom = 57):
     initial_input = np.zeros(degree_of_freedom)
     return initial_input, input_matrix
 
-def img_preprocess(img):
+def img_preprocess(img, threshold = 30, sigma = 1):
     processed_img = []
     for i in img:
-        processed_img.append(img_threshold(gaussian_filter(i, 1)))
+        processed_img.append(img_threshold(gaussian_filter(i, sigma), intensity_threshold = threshold))
     return np.array(processed_img)
