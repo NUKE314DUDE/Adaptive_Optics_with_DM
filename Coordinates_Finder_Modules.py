@@ -34,7 +34,7 @@ def grid_from_proxi_center(coordinates, avg_mode = False, pitch = 150e-6, pixel_
     if avg_mode:
         grid_gap = average_distance(coordinates, k = 7)
     else:
-        grid_gap = pitch/pixel_size
+        grid_gap = pitch / pixel_size
     lin_x = np.arange(- radius, radius + grid_gap, grid_gap)
     lin_y = np.arange(- radius, radius + grid_gap, grid_gap)
     grid_x, grid_y = np.meshgrid(lin_x, lin_y)
@@ -48,9 +48,10 @@ def grid_from_proxi_center(coordinates, avg_mode = False, pitch = 150e-6, pixel_
     include_index = distance_to_actual_center < radius
     return np.array(grid_nodes[include_index])
 
-def grid_nodes_refine(grid_coord, ref_coord):
+def grid_nodes_refine(grid_coord, ref_coord, get_rotation = False):
     """
     Refine the grid nodes to match the quantity and the rotation of the ref_coord
+    :param get_rotation:
     :param grid_coord: grid nodes generated
     :param ref_coord: padded ref_coord
     :return: refined grid nodes
@@ -78,14 +79,18 @@ def grid_nodes_refine(grid_coord, ref_coord):
     grid_normalized = centered_grid_coord / norm_grid_coord
     H = ref_normalized.T @ grid_normalized
     U, S, Vt = np.linalg.svd(H)
-    Rotation = np.array(Vt.T @ U.T)
-    if np.linalg.det(Rotation) < 0:
+    rotation = np.array(Vt.T @ U.T)
+    if np.linalg.det(rotation) < 0:
         Vt[1, :] *= -1
-        Rotation = np.array(Vt.T @ U.T)
-    final_grid_coord = centered_grid_coord @ Rotation
-    angle = np.arccos(Rotation[0, 0])
+        rotation = np.array(Vt.T @ U.T)
+    final_grid_coord = centered_grid_coord @ rotation
+    angle = np.arccos(rotation[0, 0])
     print(f"grid is rotated by {angle} rad.")
-    return np.array(final_grid_coord + grid_center)
+    if get_rotation:
+        return np.array(final_grid_coord + grid_center), rotation
+    else:
+        return np.array(final_grid_coord + grid_center)
+
 
 def img_threshold(image, intensity_threshold = 30):
     """
