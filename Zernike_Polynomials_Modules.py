@@ -4,18 +4,15 @@ import time
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 
-def show_profile(profile, X, Y):
-    """
-    Draw the profile on X, Y grid input
-    :param profile: 'height' profile to be shown
-    :param X: x dim grid
-    :param Y: y dim grid
-    :return: a plot of the profile using X, Y as the grid
-    """
+def show_profile(profile, x_grid = None, y_grid = None):
     plt.ion()
+    if x_grid.all() and y_grid.all() is None:
+        size_x, size_y = profile.shape
+        x_grid = np.arange(-size_x, size_x + 1)
+        y_grid = np.arange(-size_x, size_x + 1)
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.plot_surface(X, Y, profile, cmap="viridis")
+    ax.plot_surface(x_grid, y_grid, profile, cmap="viridis")
     plt.show()
     plt.ioff()
 
