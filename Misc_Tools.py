@@ -1,11 +1,10 @@
+import matplotlib.pyplot as plt
 import numpy as np
-from scipy.spatial import cKDTree
 from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter
 from torch.onnx.symbolic_opset9 import hann_window
 from Zernike_Polynomials_Modules import min_circle
-from Coordinates_Finder_Modules import coord_diff, closest_to_center, grid_nodes_refine, grid_from_proxi_center
-
+from Coordinates_Finder_Modules import coord_diff, grid_nodes_refine, grid_from_proxi_center
 
 def path_integration(px, py, start = (0, 0)):
     """
@@ -85,88 +84,67 @@ def peaks(size_x, size_y, ran_x = 3, ran_y = 3, normalize = False):
 
     return z, grid_x, grid_y
 
-def wavefront_gradient(padded_ref_coord, padded_current_coord, focal = 5.6e-3, pitch = 150e-6, pixel_size = 4.8e-6):
+def wavefront_reconstruction(padded_ref_coord, padded_current_coord,
+                             focal = 5.6e-3, pitch = 150e-6,
+                             pixel_size = 4.8e-6,
+                             lambda_correction = True):
 
-    current_displacement = coord_diff(padded_ref_coord, padded_current_coord) * pixel_size # matched_index marked the index from ref to current
-    padded_ref_circle = min_circle(padded_ref_coord, scale = 1.25)
     null_grid = grid_from_proxi_center(padded_ref_coord)
     _, rotation = grid_nodes_refine(null_grid, padded_ref_coord, get_rotation = True)
-    padded_ref_coord = ((padded_ref_coord - padded_ref_circle[0]) @ rotation) + padded_ref_circle[0]
-    centered_ref_coord_space = (padded_ref_coord - padded_ref_circle[0]) * pixel_size
-    space_x = np.arange(-padded_ref_circle[1] , padded_ref_circle[1]  + pitch/pixel_size, pitch/pixel_size) * pixel_size
-    space_y = np.arange(-padded_ref_circle[1] , padded_ref_circle[1]  + pitch/pixel_size, pitch/pixel_size) * pixel_size
-    grid_x, grid_y = np.meshgrid(space_x, space_y, indexing='ij')
-    gradient_x = np.zeros_like(grid_x)
-    gradient_y = np.zeros_like(grid_y)
-    # checker = np.zeros_like(gradient_x)
-    _, N = gradient_x.shape
-    space_nodes = np.stack((grid_x, grid_y), axis = -1).reshape(-1, 2)
-    fill_list = []; fill_index = []
 
-    for pos in centered_ref_coord_space:
-        dist = np.linalg.norm(space_nodes - pos, axis = 1)
-        fill_list.append(np.argmin(dist))
+    ref_circle = min_circle(padded_ref_coord, scale = 1.5)
+    grid_scale = pitch / pixel_size
+    radius_pixels = int(np.ceil(ref_circle[1]))
+    x_space = np.arange(-radius_pixels, radius_pixels + grid_scale, grid_scale) * pixel_size
+    y_space = np.arange(-radius_pixels, radius_pixels + grid_scale, grid_scale) * pixel_size
+    x_grid, y_grid = np.meshgrid(x_space, y_space, indexing = 'ij')
 
-    fill_list = sorted(fill_list)
+    ref_center = ref_circle[0]
+    rotated_ref_coord = (padded_ref_coord - ref_center) @ rotation + ref_center
+    rotated_current_coord = (padded_current_coord - ref_center) @ rotation + ref_center
 
-    for idx in fill_list:
-        fill_row = idx // N
-        fill_col = idx % N
-        fill_index.append([fill_row, fill_col])
+    displacement_pixel = coord_diff(rotated_ref_coord, rotated_current_coord)
+    displacement_meter = displacement_pixel * pixel_size
 
-    for order, operant in enumerate(fill_index):
-        current_gradient = -current_displacement / focal # check units
-        gradient_x[operant[0], operant[1]] = current_gradient[order, 0]
-        gradient_y[operant[0], operant[1]] = current_gradient[order, 1]
-        # checker[operant[0], operant[1]] = 1
+    ref_coord_phy = (rotated_ref_coord - ref_center) * pixel_size
 
-    return gradient_x, gradient_y, grid_x, grid_y
+    wavefront_slope = displacement_meter / focal
+    if lambda_correction:
+        wavefront_slope *= -1
 
-def wavefront_gradient_test(padded_ref_coord, padded_current_coord,
-                            focal = 5.6e-3, pitch = 150e-6, pixel_size = 4.8e-6):
-    """
+    gradient_x = griddata(ref_coord_phy, wavefront_slope[:, 0],
+                          (x_grid, y_grid), method = 'cubic', fill_value= 0)
+    gradient_y = griddata(ref_coord_phy, wavefront_slope[:, 1],
+                          (x_grid, y_grid), method='cubic', fill_value = 0)
 
-    :param padded_ref_coord:
-    :param padded_current_coord:
-    :param focal:
-    :param pitch:
-    :param pixel_size:
-    :return:
-    """
-    # Calculate the displacement in meters
-    current_displacement = coord_diff(padded_ref_coord, padded_current_coord) * pixel_size
+    z_reconstruct = frankot_chellappa(gradient_x, gradient_y)
 
-    # Find the minimum circle enclosing the reference coordinates
-    padded_ref_circle = min_circle(padded_ref_coord, scale=1.6)
+    return z_reconstruct, x_grid, y_grid
 
-    # Generate a grid based on the reference coordinates
-    null_grid = grid_from_proxi_center(padded_ref_coord)
-    _, rotation = grid_nodes_refine(null_grid, padded_ref_coord, get_rotation=True)
-    padded_ref_coord = ((padded_ref_coord - padded_ref_circle[0]) @ rotation) + padded_ref_circle[0]
+def show_wavefront(z, x, y,
+                   unit = 'μm',
+                   cmap = 'viridis',
+                   elev = 30, azim = 45,
+                   title = 'Reconstructed Wavefront'):
 
-    # Convert coordinates to physical space (meters)
-    centered_ref_coord_space = (padded_ref_coord - padded_ref_circle[0]) * pixel_size
+    fig = plt.figure(figsize = (10, 7))
+    ax = fig.add_subplot(111, projection = '3d')
 
-    # Create a grid in physical space
-    space_x = np.arange(-padded_ref_circle[1], padded_ref_circle[1] + pitch / pixel_size,
-                        pitch / pixel_size) * pixel_size
-    space_y = np.arange(-padded_ref_circle[1], padded_ref_circle[1] + pitch / pixel_size,
-                        pitch / pixel_size) * pixel_size
-    grid_x, grid_y = np.meshgrid(space_x, space_y, indexing='ij')
+    surf = ax.plot_surface(x, y, z,
+                           cmap = cmap,
+                           rstride = 1,
+                           cstride = 1,
+                           linewidth = 0,
+                           antialiased = True)
 
-    # Initialize gradient fields
-    gradient_x = np.zeros_like(grid_x)
-    gradient_y = np.zeros_like(grid_y)
+    ax.set_xlabel(f'X [{unit}]', fontsize=12)
+    ax.set_ylabel(f'Y [{unit}]', fontsize=12)
+    ax.set_zlabel(f'Wavefront [{unit}]', fontsize=12)
 
-    # Calculate the gradient in physical space (radians)
-    current_gradient = current_displacement / focal
+    ax.view_init(elev=elev, azim=azim)
+    cbar = fig.colorbar(surf, shrink=0.6)
+    cbar.set_label(f'Height [{unit}]', rotation=270, labelpad=20)
 
-    # Interpolate the gradient onto the grid
-    points = centered_ref_coord_space
-    values_x = -current_gradient[:, 0]
-    values_y = -current_gradient[:, 1]
-
-    gradient_x = griddata(points, values_x, (grid_x, grid_y), method='linear', fill_value=0)
-    gradient_y = griddata(points, values_y, (grid_x, grid_y), method='linear', fill_value=0)
-
-    return gradient_x, gradient_y, grid_x, grid_y
+    plt.title(title, fontsize = 14)
+    plt.tight_layout()
+    plt.show()
