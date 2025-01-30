@@ -4,12 +4,40 @@ import time
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 
+input_zernike = [(1, -1),
+                 (1, 1),
+                 (2, -2),
+                 (2, 0),
+                 (2, 2),
+                 (3, -3),
+                 (3, -1),
+                 (3, 1),
+                 (3, 3),
+                 (4, -4),
+                 (4, -2),
+                 (4, 0),
+                 (4, 2),
+                 (4, 4),
+                 (5, -5),
+                 (5, -3),
+                 (5, -1),
+                 (5, 1),
+                 (5, 3),
+                 (5, 5),
+                 (6, -6),
+                 (6, -4),
+                 (6, -2),
+                 (6, 0),
+                 (6, 2),
+                 (6, 4),
+                 (6, 6)]
+
 def show_profile(profile, x_grid = None, y_grid = None):
     plt.ion()
-    if x_grid.all() and y_grid.all() is None:
-        size_x, size_y = profile.shape
-        x_grid = np.arange(-size_x, size_x + 1)
-        y_grid = np.arange(-size_x, size_x + 1)
+    if x_grid is None or y_grid is None:
+        size_y, size_x = profile.shape
+        x_grid, y_grid = np.meshgrid(np.arange(size_x), np.arange(size_y))
+
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     ax.plot_surface(x_grid, y_grid, profile, cmap="viridis")
@@ -21,6 +49,22 @@ def mean_gradient(image):
     gradient = np.gradient(np.array(image))
     abs_grad = np.sqrt(gradient[0]**2 + gradient[1]**2)
     return np.mean(abs_grad)
+
+def normalization(data):
+    """
+    Normalize the data into range [-1, 1]
+    :param data:
+    :return: normalized data
+    """
+    data = np.array(data)
+    nan_index= np.isnan(data)
+    data[nan_index] = 0.
+    max_data = np.max(data)
+    min_data = np.min(data)
+    normalized_data = 2 * (data - min_data) / (max_data - min_data) - 1
+    normalized_data[nan_index] = np.nan
+
+    return normalized_data
 
 def kronecker_delta(i, j):
     """
@@ -143,9 +187,10 @@ class Zernike:
         self.fMat = {k: v for k, v in self.fMat.items() if v != 0}
         return self.fMat
 
-    def zern_from_cof(self, cof_dict, ref_padded_img, ref_circle, cut = True):
+    def zern_from_cof(self, cof_dict, ref_padded_img, ref_circle, cut = True, normalize = False):
         """
         Calculate the height profile of a given zernike cof dict
+        :param normalize: rescale the zernike profile into [-1, 1]
         :param cof_dict: -
         :param ref_padded_img: padded image as a reference for size
         :param ref_circle: reference minimum circle to define the unit circle
@@ -165,10 +210,18 @@ class Zernike:
         for (x_pow, y_pow), factor in cof_dict.items():
             factor = np.float64(factor)
             self.zern_profile += factor * (X ** x_pow * Y ** y_pow)
+
         if cut:
             dist = X ** 2 + Y ** 2
             self.zern_profile[dist > 1] = None
-            return self.zern_profile, X, Y
+        else:
+            dist = X ** 2 + Y ** 2
+            self.zern_profile[dist > 1] = 0.
+
+        if normalize:
+            self.zern_profile = normalization(self.zern_profile)
+
+        return self.zern_profile, X, Y
 
     def zern_local_gradient(self, zern_profile, ref_coord, focal = 5.2e-3, pitch = 150e-6, pixel_size = 4.8e-6):
         """
@@ -184,13 +237,17 @@ class Zernike:
         gradient_x, gradient_y = np.gradient(zern_profile)
         self.gradient_shift = []
         for j in ref_coord:
-            top_w,bot_w = int(np.floor(j[0] - window_size)), int(np.floor(j[0] + window_size))
+            top_w, bot_w = int(np.floor(j[0] - window_size)), int(np.floor(j[0] + window_size))
             lft_w, rgt_w = int(np.floor(j[1] - window_size)), int(np.floor(j[1] + window_size))
             avg_x = np.mean(gradient_x[top_w:bot_w, lft_w:rgt_w])
             avg_y = np.mean(gradient_y[top_w:bot_w, lft_w:rgt_w])
             self.gradient_shift.extend([avg_x, avg_y])
         # self.gradient_shift /= np.max(abs(np.array(self.gradient_shift)))
-        return np.array(self.gradient_shift)*focal
+        if np.isnan(self.gradient_shift).any(): print("nan found in zernike coordinates! setting them to zero...")
+
+        self.gradient_shift = np.nan_to_num(self.gradient_shift)
+
+        return np.array(self.gradient_shift)*focal/pixel_size
 
     @staticmethod
     def binorm(n, k):
