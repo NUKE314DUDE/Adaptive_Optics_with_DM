@@ -85,7 +85,7 @@ def grid_nodes_refine(grid_coord, ref_coord, get_rotation = False):
         rotation = np.array(Vt.T @ U.T)
     final_grid_coord = centered_grid_coord @ rotation
     angle = np.arccos(rotation[0, 0])
-    print(f"grid is rotated by {angle} rad.")
+    # print(f"grid is rotated by {angle} rad.")
     if get_rotation:
         return np.array(final_grid_coord + grid_center), rotation
     else:
@@ -120,8 +120,9 @@ def show_coord(image, coord, circle = None):
             y = max(0, min(y, width - 1))
             ax.text(y, x, u'\u2715', color='red', fontsize=12, ha='center', va='center')  # Add markers for founded extrema
         ax.set_title(f'A total of {int(len(coord))} centroids marked')
-        plt.show()
         plt.ioff()
+        plt.show()
+
     else:
         [height, width] = image.shape
         plt.ion()
@@ -139,8 +140,9 @@ def show_coord(image, coord, circle = None):
         y_circle = center[1] + radius * np.sin(theta)
         ax.plot(y_circle, x_circle, color="b") # draw a circle
         ax.set_title(f'A total of {int(len(coord))} centroids marked \n Centered on {center} radius: {radius}')
-        plt.show()
         plt.ioff()
+        plt.show()
+
 
 def show_coord_diff(image, ref_coord, test_coord):
     """

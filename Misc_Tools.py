@@ -3,7 +3,7 @@ import numpy as np
 from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter
 from torch.onnx.symbolic_opset9 import hann_window
-from Zernike_Polynomials_Modules import min_circle
+from Zernike_Polynomials_Modules import min_circle, normalization
 from Coordinates_Finder_Modules import coord_diff, grid_nodes_refine, grid_from_proxi_center
 
 def path_integration(px, py, start = (0, 0)):
@@ -78,9 +78,10 @@ def peaks(size_x, size_y, ran_x = 3, ran_y = 3, normalize = False):
     z = 3 * (1 - grid_x)**2 * np.exp(- grid_x**2 - (grid_y + 1)**2) - 10 * (grid_x / 5 - grid_x**3 - grid_y **5) * np.exp(-grid_x**2 - grid_y**2) - 1/3 * np.exp(-(grid_x + 1)**2 - grid_y**2)
 
     if normalize:
-        max_z = np.max(z)
-        min_z = np.min(z)
-        z = 2 * (z - min_z) / (max_z - min_z) - 1
+        # max_z = np.max(z)
+        # min_z = np.min(z)
+        # z = 2 * (z - min_z) / (max_z - min_z) - 1
+        z = normalization(z)
 
     return z, grid_x, grid_y
 
