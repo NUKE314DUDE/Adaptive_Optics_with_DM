@@ -223,7 +223,7 @@ class Zernike:
 
         return self.zern_profile, X, Y
 
-    def zern_local_gradient(self, zern_profile, ref_coord,focal = 5.6e-3, pitch = 150e-6, pixel_size = 4.8e-6,):
+    def zern_local_gradient(self, zern_profile, ref_coord, focal = 5.6e-3, pitch = 150e-6, pixel_size = 4.8e-6,):
         """
         Calculate the local gradient in the normalized Zernike profile, area defined by the reference coordinates and the window size
         :param focal: focal of the lens-array
@@ -231,7 +231,7 @@ class Zernike:
         :param pitch: pitch of the lens-array
         :param zern_profile: zernike profile to be processed
         :param ref_coord: reference coordinates for calculating local gradients
-        :return:
+        :return: local averaged gradient of the profile at ref_coord
         """
         window_size = np.ceil(pitch/(2*pixel_size))
         gradient_x, gradient_y = np.gradient(zern_profile)
@@ -247,7 +247,7 @@ class Zernike:
 
         self.gradient_shift = np.nan_to_num(self.gradient_shift)
 
-        return np.array(self.gradient_shift)*focal/pixel_size
+        return np.array(self.gradient_shift)
 
     @staticmethod
     def binorm(n, k):
