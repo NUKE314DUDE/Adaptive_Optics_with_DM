@@ -87,7 +87,7 @@ def peaks(size_x, size_y, ran_x = 3, ran_y = 3, normalize = False):
 
 def wavefront_reconstruction(padded_ref_coord, padded_current_coord,
                              focal=5.6e-3, pitch=150e-6,
-                             pixel_size=4.8e-6, magnification=1.0,
+                             pixel_size=4.8e-6,
                              lambda_correction=True):
     """
     Reconstruct the wavefront on WFS using centroid displacement
@@ -96,7 +96,6 @@ def wavefront_reconstruction(padded_ref_coord, padded_current_coord,
     :param focal:
     :param pitch:
     :param pixel_size:
-    :param magnification: magnification from DM to WFS
     :param lambda_correction:
     :return: reconstructed profile on DM plane
     """
@@ -107,23 +106,21 @@ def wavefront_reconstruction(padded_ref_coord, padded_current_coord,
     ref_center = min_circle(padded_ref_coord)[0]
     rotated_ref_coord = (padded_ref_coord - ref_center) @ rotation + ref_center
     rotated_current_coord = (padded_current_coord - ref_center) @ rotation + ref_center
-
-    pixel_size_effective = pixel_size  # WFS平面的像素尺寸不变
-    pitch_effective = pitch / magnification  # DM表面的有效间距
-
-    ref_circle = min_circle(rotated_ref_coord, scale=1.5)
+    ref_circle = min_circle(rotated_ref_coord, scale=1.6)
     radius_pixels = int(np.ceil(ref_circle[1]))
-    x_space = np.arange(-radius_pixels, radius_pixels + pitch_effective/pixel_size_effective,
-                        pitch_effective/pixel_size_effective) * pixel_size_effective
-    y_space = np.arange(-radius_pixels, radius_pixels + pitch_effective/pixel_size_effective,
-                        pitch_effective/pixel_size_effective) * pixel_size_effective
+
+    x_space = np.arange(-radius_pixels, radius_pixels + pitch / pixel_size,
+                        pitch / pixel_size) * pixel_size
+    y_space = np.arange(-radius_pixels, radius_pixels + pitch / pixel_size,
+                        pitch / pixel_size) * pixel_size
     x_grid, y_grid = np.meshgrid(x_space, y_space, indexing='ij')
 
     displacement_pixel = coord_diff(rotated_ref_coord, rotated_current_coord)
-    displacement_meter = displacement_pixel * pixel_size_effective
+    displacement_meter = displacement_pixel * pixel_size
 
-    ref_coord_phy = (rotated_ref_coord - ref_center) * pixel_size_effective
-    wavefront_slope = displacement_meter / focal
+    ref_coord_phy = (rotated_ref_coord - ref_center) * pixel_size
+    wavefront_slope = pitch * displacement_meter / focal
+
     if lambda_correction:
         wavefront_slope *= -1
 
@@ -134,11 +131,7 @@ def wavefront_reconstruction(padded_ref_coord, padded_current_coord,
 
     z_reconstruct = frankot_chellappa(gradient_x, gradient_y)
 
-    z_reconstruct_dm = z_reconstruct / (magnification**2)
-    x_grid_dm = x_grid
-    y_grid_dm = y_grid
-
-    return z_reconstruct_dm, x_grid_dm, y_grid_dm
+    return z_reconstruct, x_grid, y_grid
 
 def show_wavefront(z, x, y,
                    unit = 'μm',
