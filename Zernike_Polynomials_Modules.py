@@ -223,10 +223,9 @@ class Zernike:
 
         return self.zern_profile, X, Y
 
-    def zern_local_gradient(self, zern_profile, ref_coord, focal = 5.6e-3, pitch = 150e-6, pixel_size = 4.8e-6,):
+    def zern_local_gradient(self, zern_profile, ref_coord, pitch = 150e-6, pixel_size = 4.8e-6):
         """
         Calculate the local gradient in the normalized Zernike profile, area defined by the reference coordinates and the window size
-        :param focal: focal of the lens-array
         :param pixel_size: camera's pixel size
         :param pitch: pitch of the lens-array
         :param zern_profile: zernike profile to be processed
