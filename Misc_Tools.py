@@ -85,6 +85,19 @@ def peaks(size_x, size_y, ran_x = 3, ran_y = 3, normalize = False):
 
     return z, grid_x, grid_y
 
+def gaussian(x_space, amp = 1., mean = 0., std_dev = 1.):
+    """
+    Gaussian distribution
+    :param x_space: x coordinates
+    :param amp: amplitude
+    :param mean:
+    :param std_dev:
+    :return:
+    """
+    y = amp*(1/(std_dev*np.sqrt(2*np.pi)))*np.exp(-(x_space - mean)**2/(2 * std_dev**2))
+
+    return np.array(y)
+
 def wavefront_reconstruction(padded_ref_coord, padded_current_coord,
                              focal=5.6e-3, pitch=150e-6,
                              pixel_size=4.8e-6,
