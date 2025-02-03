@@ -41,6 +41,7 @@ def show_profile(profile, x_grid = None, y_grid = None):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     ax.plot_surface(x_grid, y_grid, profile, cmap="viridis")
+    plt.tight_layout()
     plt.show()
     plt.ioff()
 
