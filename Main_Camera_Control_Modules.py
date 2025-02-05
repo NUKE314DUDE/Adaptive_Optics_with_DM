@@ -207,6 +207,12 @@ if __name__ == "__main__":
     test_img = main_cam.get_last_live_frame()
     if test_img is None: print('Check camera setting!')
 
+    for par in main_cam.camera:
+        if "enum_values" in main_cam.camera[par].keys():
+            print(main_cam.camera[par]["uname"],main_cam.camera[par]['enum_values'],main_cam.camera[par]['default_value'])
+        else:
+            print(main_cam.camera[par]["uname"],main_cam.camera[par]['min_value'],main_cam.camera[par]['max_value'],main_cam.camera[par]['default_value'])
+
     stop_thread = threading.Thread(target=stop_live_thread)
     stop_thread.daemon = True
     stop_thread.start()
@@ -226,6 +232,5 @@ if __name__ == "__main__":
             time.sleep(0.001)
     except KeyboardInterrupt:
         print('User input interrupt...')
-
     plt.ioff()
     plt.show()
