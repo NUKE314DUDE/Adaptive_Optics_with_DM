@@ -213,6 +213,7 @@ if __name__ == "__main__":
         else:
             print(main_cam.camera[par]["uname"],main_cam.camera[par]['min_value'],main_cam.camera[par]['max_value'],main_cam.camera[par]['default_value'])
 
+
     stop_thread = threading.Thread(target=stop_live_thread)
     stop_thread.daemon = True
     stop_thread.start()
@@ -232,5 +233,6 @@ if __name__ == "__main__":
             time.sleep(0.001)
     except KeyboardInterrupt:
         print('User input interrupt...')
+
     plt.ioff()
     plt.show()
