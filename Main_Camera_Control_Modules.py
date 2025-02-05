@@ -7,8 +7,6 @@ import matplotlib.pyplot as plt
 
 ## credit to Vipin Balan ##
 
-stop_live = False
-
 def stop_live_thread():
     global stop_live
     while 1:
@@ -187,7 +185,7 @@ class mainCamera:
             print(f"Error in stop live: {e}")
 
 if __name__ == "__main__":
-
+    stop_live = False
     CAM_SIZE = 2304
     IMAG_SIZE = (CAM_SIZE, 480)
     image_16Raw = RawArray('H', IMAG_SIZE[0] * IMAG_SIZE[1])
