@@ -2,9 +2,6 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-
-from Zernike_Polynomials_Modules import min_circle
-
 os.add_dll_directory(os.getcwd())
 current_script_path = os.path.abspath(__file__)
 current_directory = os.path.dirname(current_script_path)
@@ -12,21 +9,46 @@ os.chdir(current_directory)
 from Coordinates_Finder_Modules import img_threshold, extrema_coordinates_gradient, \
     exclude_proxi_points, center_of_gravity_with_coord, show_coord, coord_diff, precise_coord, \
     show_coord_diff, precise_coord_fixed_ref, deformable_mirror_single_probe_input
+from Zernike_Polynomials_Modules import min_circle
 # from thorlabs_tsi_sdk.tl_camera import TLCameraSDK
 from Lib64.asdk import DM
 from ids import camera
 from ids import ids_peak, ids_peak_ipl_extension
-from From_Voltage_to_Zernikes import camera_snapshot
-dm = DM("BAX758")
+
 if __name__ == "__main__":
 
     # Initialization
-    # thorsdk = TLCameraSDK()
-    # camera = thorsdk.open_camera(thorsdk.discover_available_cameras()[0])
-    # camera.exposure_time_us = 40
-    # camera.frames_per_trigger_zero_for_unlimited = 0  # start camera in continuous mode
-    # camera.image_poll_timeout_ms = 1000  # 1 second polling timeout
-    # camera.arm(2)
+    dm = DM("BAX758")
+
+    def camera_snapshot(input_voltage=None, gap=0.05):
+
+        image = None
+        if input_voltage is None:
+            for j in range(4):
+                image = camera.get_frame()
+        else:
+            dm.Send(input_voltage)
+            time.sleep(gap)
+            for j in range(4):
+                image = camera.get_frame()
+        return image.astype(float)
+
+    # def camera_snapshot(voltages = None, gap = 0.05, repeat = 4, timeout_ms = 1000):
+    #     image = None
+    #     if voltages is None:
+    #         for count in range(repeat):
+    #             buffer = camera.data_stream.WaitForFinishedBuffer(timeout_ms)
+    #             image = np.copy(ids_peak_ipl_extension.BufferToImage(buffer).get_numpy())
+    #             camera.data_stream.QueueBuffer(buffer)
+    #     else:
+    #         dm.Send(voltages)
+    #         time.sleep(gap)
+    #         for count in range(repeat):
+    #             buffer = camera.data_stream.WaitForFinishedBuffer(timeout_ms)
+    #             image = np.copy(ids_peak_ipl_extension.BufferToImage(buffer).get_numpy())
+    #             camera.data_stream.QueueBuffer(buffer)
+    #         return image
+
     camera = camera()
     camera.set_bit_depth(8)
     camera.set_full_chip()
@@ -35,7 +57,12 @@ if __name__ == "__main__":
     camera.set_gain(1.0)
     camera.start_acquisition()
 
-    # Device call function
+    # thorsdk = TLCameraSDK()
+    # camera = thorsdk.open_camera(thorsdk.discover_available_cameras()[0])
+    # camera.exposure_time_us = 40
+    # camera.frames_per_trigger_zero_for_unlimited = 0  # start camera in continuous mode
+    # camera.image_poll_timeout_ms = 1000  # 1 second polling timeout
+    # camera.arm(2)
 
     probe_range = 0.25
     ref_voltage, probe_voltage = deformable_mirror_single_probe_input(probe_range, degree_of_freedom=57)
@@ -82,6 +109,7 @@ if __name__ == "__main__":
     print(f"The saved probe matrix's shape is {coordinates_diff.shape}")
     camera.stop_acquisition()
     camera.close()
+    # camera.disarm()
     dm.Stop()
     show_coord_diff(current_frame, ref_coord, current_coordinates)
     plt.show()

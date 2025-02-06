@@ -14,16 +14,40 @@ from Coordinates_Finder_Modules import img_threshold, extrema_coordinates_gradie
 from ids import camera
 from ids import ids_peak, ids_peak_ipl_extension
 from Lib64.asdk import DM
-from From_Voltage_to_Zernikes import camera_snapshot
-dm = DM("BAX758")
+
 if __name__ == "__main__":
     # Initialization
-    # thorsdk = TLCameraSDK()
-    # camera = thorsdk.open_camera(thorsdk.discover_available_cameras()[0])
-    # camera.exposure_time_us = 40
-    # camera.frames_per_trigger_zero_for_unlimited = 0  # start camera in continuous mode
-    # camera.image_poll_timeout_ms = 1000  # 1 second polling timeout
-    # camera.arm(2)
+    dm = DM("BAX758")
+
+    def camera_snapshot(input_voltage=None, gap=0.05):
+
+        image = None
+        if input_voltage is None:
+            for j in range(4):
+                image = camera.get_frame()
+        else:
+            dm.Send(input_voltage)
+            time.sleep(gap)
+            for j in range(4):
+                image = camera.get_frame()
+        return image.astype(float)
+
+    # def camera_snapshot(voltages = None, gap = 0.05, repeat = 4, timeout_ms = 1000):
+    #     image = None
+    #     if voltages is None:
+    #         for count in range(repeat):
+    #             buffer = camera.data_stream.WaitForFinishedBuffer(timeout_ms)
+    #             image = np.copy(ids_peak_ipl_extension.BufferToImage(buffer).get_numpy())
+    #             camera.data_stream.QueueBuffer(buffer)
+    #     else:
+    #         dm.Send(voltages)
+    #         time.sleep(gap)
+    #         for count in range(repeat):
+    #             buffer = camera.data_stream.WaitForFinishedBuffer(timeout_ms)
+    #             image = np.copy(ids_peak_ipl_extension.BufferToImage(buffer).get_numpy())
+    #             camera.data_stream.QueueBuffer(buffer)
+    #         return image
+
     camera = camera()
     camera.set_bit_depth(8)
     camera.set_full_chip()
@@ -31,6 +55,14 @@ if __name__ == "__main__":
     camera.set_exposure_ms(0.015)
     camera.set_gain(1.0)
     camera.start_acquisition()
+
+    # thorsdk = TLCameraSDK()
+    # camera = thorsdk.open_camera(thorsdk.discover_available_cameras()[0])
+    # camera.exposure_time_us = 40
+    # camera.frames_per_trigger_zero_for_unlimited = 0  # start camera in continuous mode
+    # camera.image_poll_timeout_ms = 1000  # 1 second polling timeout
+    # camera.arm(2)
+
     ran = 0.25
     probed_transport_matrix = np.load(f"Data_Deposit/range_{ran}_probe_coordinates_diff.npy")# Load saved probe results
     inverse_transport_matrix = np.linalg.pinv(probed_transport_matrix)# Get pseudo inverse matrix
@@ -51,6 +83,8 @@ if __name__ == "__main__":
     # print(test_voltage_input)
     # print(initial_new_voltage)
     c_mse = 0
+
+    # Close loop test
     while True:
         counter += 1
         current_frame = camera_snapshot(vol_carrier)
