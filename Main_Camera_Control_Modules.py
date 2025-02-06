@@ -24,7 +24,7 @@ def test_live_feed_thread(cam, img, stop_event):
             if carrier is not None:
                 img[:, :] = carrier[:]
         except Exception as e:
-            print(f"Error in get last live frame: {e}")
+            print(f"Error test live feed thread: {e}")
             break
 
 class mainCamera:
@@ -185,12 +185,13 @@ class mainCamera:
 
 if __name__ == "__main__":
     CAM_SIZE = 2304
-    IMG_SIZE = (CAM_SIZE, 480)
+    IMG_SIZE = (1024, 480)
     image_16Raw = RawArray('H', IMG_SIZE[0] * IMG_SIZE[1])
+    frame = np.frombuffer(image_16Raw, dtype='uint16').reshape(IMG_SIZE)
+
     main_cam = mainCamera()
     main_cam.camera_open()
-    frame = np.frombuffer(image_16Raw, dtype='uint16').reshape(IMG_SIZE)
-    main_cam.set_single_parameter("subarray_mode", 2)
+    main_cam.set_single_parameter("subarray_mode", 2.0)
     main_cam.set_single_parameter("subarray_hsize", IMG_SIZE[0])
     main_cam.set_single_parameter("subarray_vsize", IMG_SIZE[1])
     main_cam.set_single_parameter("subarray_hpos", int((CAM_SIZE / 2 - IMG_SIZE[0] / 2)))
@@ -222,8 +223,8 @@ if __name__ == "__main__":
 
     plt.ion()
     fig, ax = plt.subplots()
-    live_img = ax.imshow(frame, cmap='gray', vmin=0, vmax = 40000)
-
+    live_img = ax.imshow(frame)
+    plt.show()
     try:
         while not stopper.is_set():
             live_img.set_data(frame.astype("float"))
@@ -231,6 +232,9 @@ if __name__ == "__main__":
             time.sleep(0.001)
     except KeyboardInterrupt:
         print('User interrupt...')
-
-    plt.ioff()
-    plt.show()
+    finally:
+        plt.close()
+        stopper.set()
+        stop_thread.join()
+        live_feed.join()
+        plt.ioff()

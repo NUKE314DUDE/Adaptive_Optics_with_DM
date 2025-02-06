@@ -12,11 +12,12 @@ from DM_Control_Modules import AlPaoDM, smoothed_sawtooth
 
 if __name__ == '__main__':
     CAM_SIZE = 2304
-    IMG_SIZE = (CAM_SIZE, 480)
+    IMG_SIZE = (1024, 480)
     live_frame_raw = RawArray('H', IMG_SIZE[0] * IMG_SIZE[1])
     live_frame = np.frombuffer(live_frame_raw, dtype='uint16').reshape(IMG_SIZE)
 
     main_cam = mainCamera()
+    main_cam.camera_open()
     main_cam.set_single_parameter("subarray_mode", 2)
     main_cam.set_single_parameter("subarray_hsize", IMG_SIZE[0])
     main_cam.set_single_parameter("subarray_vsize", IMG_SIZE[1])
@@ -27,24 +28,24 @@ if __name__ == '__main__':
 
     DM = AlPaoDM()
 
-    amp_modulation = smoothed_sawtooth(cut_freq_low = 10000, sig_freq = 20)
+    amp_modulation = smoothed_sawtooth(cut_freq_low = 10000, sig_freq = 200)
     seq_length = len(amp_modulation)
     seq = np.zeros((27, seq_length))
     seq[2] = amp_modulation
     DM.send_zernike_patterns(seq, repeat = 0)
 
-    main_cam.camera_open()
     main_cam.start_live()
 
     stopper = threading.Event()
 
-    live_feed = threading.Thread(target = test_live_feed_thread, args = (main_cam, live_frame))
+    live_feed = threading.Thread(target = test_live_feed_thread, args = (main_cam, live_frame, stopper))
     live_feed.daemon = True; live_feed.start()
 
     stop_thread = threading.Thread(target = test_stop_live_thread, args = (main_cam, stopper))
     stop_thread.daemon = True; stop_thread.start()
 
-    fig, ax = plt.figure(figsize = (10, 6.18))
+    fig = plt.figure(figsize = (10, 6.18))
+    ax = fig.add_subplot(1,1,1)
     monitor = ax.imshow(live_frame, cmap='gray')
     plt.ion()
     plt.show()
@@ -55,5 +56,10 @@ if __name__ == '__main__':
             fig.canvas.flush_events()
     except KeyboardInterrupt:
         print("User interrupt")
-
-    plt.ioff()
+    finally:
+        plt.close()
+        stopper.set()
+        live_feed.join()
+        stop_thread.join()
+        DM.stop_loop()
+        plt.ioff()
