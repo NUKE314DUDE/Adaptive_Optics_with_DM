@@ -2,3 +2,6 @@ Reference/
 .idea/
 __pycache__/
 Draft_Board.py/
+Lib64/
+thorlabs_tsi_camera_sdk.dll/
+thorlabs_tsi_sdk-0.0.8/
