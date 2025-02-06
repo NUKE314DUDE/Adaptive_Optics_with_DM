@@ -1,10 +1,38 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.interpolate import griddata
+from scipy.signal import butter, filtfilt
 from scipy.ndimage import gaussian_filter
 from torch.onnx.symbolic_opset9 import hann_window
 from Zernike_Polynomials_Modules import min_circle, normalization
 from Coordinates_Finder_Modules import coord_diff, grid_nodes_refine, grid_from_proxi_center
+
+def pass_filter(signal, sample_freq, cut_low = None, cut_high = None, order = 3):
+    """
+    Butter filter with different modes
+    :param signal:
+    :param sample_freq:
+    :param cut_low:
+    :param cut_high:
+    :param order:
+    :return: filtered signal
+    """
+    nq_freq = sample_freq * 0.5
+    if cut_low is None and cut_high is not None:
+        high = cut_high / nq_freq
+        b, a = butter(order, high, btype='high')
+        filtered_signal = filtfilt(b, a, signal)
+    elif cut_low is not None and cut_high is None:
+        low = cut_low / nq_freq
+        b, a = butter(order, low, btype='low')
+        filtered_signal = filtfilt(b, a, signal)
+    elif cut_low is not None and cut_high is not None:
+        low = cut_low / nq_freq; high = cut_high / nq_freq
+        b, a = butter(order, [low, high], btype='band')
+        filtered_signal = filtfilt(b, a, signal)
+    else:
+        raise TypeError('No critical frequency entered!')
+    return filtered_signal
 
 def path_integration(px, py, start = (0, 0)):
     """

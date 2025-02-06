@@ -7,8 +7,6 @@ import matplotlib.pyplot as plt
 
 ## credit to Vipin Balan ##
 
-stop_live = False
-
 def stop_live_thread():
     global stop_live
     while 1:
@@ -187,7 +185,7 @@ class mainCamera:
             print(f"Error in stop live: {e}")
 
 if __name__ == "__main__":
-
+    stop_live = False
     CAM_SIZE = 2304
     IMAG_SIZE = (CAM_SIZE, 480)
     image_16Raw = RawArray('H', IMAG_SIZE[0] * IMAG_SIZE[1])
@@ -206,6 +204,13 @@ if __name__ == "__main__":
 
     test_img = main_cam.get_last_live_frame()
     if test_img is None: print('Check camera setting!')
+
+    for par in main_cam.camera:
+        if "enum_values" in main_cam.camera[par].keys():
+            print(main_cam.camera[par]["uname"],main_cam.camera[par]['enum_values'],main_cam.camera[par]['default_value'])
+        else:
+            print(main_cam.camera[par]["uname"],main_cam.camera[par]['min_value'],main_cam.camera[par]['max_value'],main_cam.camera[par]['default_value'])
+
 
     stop_thread = threading.Thread(target=stop_live_thread)
     stop_thread.daemon = True

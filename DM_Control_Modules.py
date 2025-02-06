@@ -2,18 +2,46 @@ import time
 import numpy as np
 import ctypes
 import os.path
-
 os.add_dll_directory(os.getcwd())
 current_script_path = os.path.abspath(__file__)
 current_directory = os.path.dirname(current_script_path)
 os.chdir(current_directory)
 import multiprocessing as mp
+from Misc_Tools import pass_filter, normalization
+
 
 RAN = 0.25
 DOF = 57
 SN = "BAX758"
 ZERN_to_VOLT_MATRIX_PATH = f"Data_Deposit/range_{RAN}_zernike_to_voltage.npy"
 
+def smoothed_sawtooth(fill = 0.95, cut_freq_low = None, cut_freq_high = None, sig_freq = None, dm_sample_duration = None):
+    """
+    Generate smoothed (or original) sawtooth signal
+    :param fill: ratio of the rising edge
+    :param cut_freq_low:
+    :param cut_freq_high:
+    :param sig_freq:
+    :param dm_sample_duration:
+    :return: normalized and smoothed sawtooth signal
+    """
+    if sig_freq is None: sig_freq = 1000
+    if dm_sample_duration is None: dm_sample_duration = 6.67e-6
+    sig_length = int(np.ceil((1 / sig_freq) / dm_sample_duration))
+    l1 = int(np.ceil(fill * sig_length)); l2 = sig_length - l1
+    l1 = l1 + 1 + l1%2; l2 = l2 + 1 + l2%2
+    # defocus_seq = np.concatenate((np.linspace(-1.0, 1.0, l1),
+    #                              np.linspace(1.0, -1.0, l2)))
+    t1 = np.bartlett(l1)[: l1 // 2 + 1]
+    t2 = np.bartlett(l2)[l2 // 2 + 1:]
+    defocus_seq = np.concatenate((t1, t2))
+    padding_size = len(defocus_seq) // 2
+    defocus_seq = np.pad(defocus_seq, padding_size, mode = 'wrap')
+    if cut_freq_low is None and cut_freq_high is None:
+        return normalization(defocus_seq[padding_size:-padding_size])
+    else:
+        smoothed_defocus_seq = pass_filter(defocus_seq, 1 / dm_sample_duration, cut_freq_low, cut_freq_high)
+        return normalization(smoothed_defocus_seq[padding_size:-padding_size])
 
 def alpao_loop_single(sequence_raw, stop_raw):
 
