@@ -1,14 +1,14 @@
 import os
 from multiprocessing.sharedctypes import RawArray
-os.add_dll_directory(os.getcwd())
-current_script_path = os.path.abspath(__file__)
-current_directory = os.path.dirname(current_script_path)
-os.chdir(current_directory)
 import numpy as np
 import threading
 import matplotlib.pyplot as plt
 from Main_Camera_Control_Modules import mainCamera, test_live_feed_thread, test_stop_live_thread
 from DM_Control_Modules import AlPaoDM, smoothed_sawtooth
+os.add_dll_directory(os.getcwd())
+current_script_path = os.path.abspath(__file__)
+current_directory = os.path.dirname(current_script_path)
+os.chdir(current_directory)
 
 if __name__ == '__main__':
     CAM_SIZE = 2304

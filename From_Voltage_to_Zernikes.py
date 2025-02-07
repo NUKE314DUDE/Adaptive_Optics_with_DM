@@ -1,8 +1,4 @@
 import os
-os.add_dll_directory(os.getcwd())
-current_script_path = os.path.abspath(__file__)
-current_directory = os.path.dirname(current_script_path)
-os.chdir(current_directory)
 import time
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,6 +8,10 @@ from Zernike_Polynomials_Modules import min_circle, Zernike, image_padding_for_c
 from Lib64.asdk import DM
 from ids import camera
 from ids import ids_peak, ids_peak_ipl_extension
+os.add_dll_directory(os.getcwd())
+current_script_path = os.path.abspath(__file__)
+current_directory = os.path.dirname(current_script_path)
+os.chdir(current_directory)
 
 if __name__ == "__main__":
 
