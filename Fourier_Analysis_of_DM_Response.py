@@ -1,13 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+from Coordinates_Finder_Modules import precise_coord, precise_coord_fixed_ref, extrema_coordinates_gradient, show_coord, \
+    exclude_proxi_points, img_preprocess, center_of_gravity_with_coord, average_distance, coord_diff
 os.add_dll_directory(os.getcwd())
 current_script_path = os.path.abspath(__file__)
 current_directory = os.path.dirname(current_script_path)
 os.chdir(current_directory)
-import imageio
-from Coordinates_Finder_Modules import precise_coord, precise_coord_fixed_ref, extrema_coordinates_gradient, show_coord, \
-    exclude_proxi_points, img_preprocess, center_of_gravity_with_coord, average_distance, coord_diff
 
 FRAME_RATE = 1000
 MIN_DIST = 10

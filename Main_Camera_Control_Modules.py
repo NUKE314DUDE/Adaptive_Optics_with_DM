@@ -7,26 +7,25 @@ import matplotlib.pyplot as plt
 
 ## credit to Vipin Balan ##
 
-def stop_live_thread():
-    global stop_live
-    while 1:
+def test_stop_live_thread(cam, stop_event):
+    while not stop_event.is_set():
         key = input()
         if key == 'x':
             print('Stopping Camera live...')
-            stop_live = True
-            main_cam.stop_live()
-            main_cam.camera_close()
+            stop_event.set()
+            cam.stop_live()
+            cam.camera_close()
             break
 
-def live_feed_thread(cam, img):
-    global stop_live
-    while not stop_live:
+def test_live_feed_thread(cam, img, stop_event):
+    while not stop_event.is_set():
         try:
-            frame = cam.get_last_live_frame()
-            if frame is not None:
-                img[:, :] = frame[:]
+            carrier = cam.get_last_live_frame()
+            if carrier is not None:
+                img[:, :] = carrier[:]
         except Exception as e:
-            print(f"Error in get last live frame: {e}")
+            print(f"Error test live feed thread: {e}")
+            break
 
 class mainCamera:
     def __init__(self):
@@ -185,18 +184,18 @@ class mainCamera:
             print(f"Error in stop live: {e}")
 
 if __name__ == "__main__":
-    stop_live = False
     CAM_SIZE = 2304
-    IMAG_SIZE = (CAM_SIZE, 480)
-    image_16Raw = RawArray('H', IMAG_SIZE[0] * IMAG_SIZE[1])
+    IMG_SIZE = (1024, 480)
+    image_16Raw = RawArray('H', IMG_SIZE[0] * IMG_SIZE[1])
+    frame = np.frombuffer(image_16Raw, dtype='uint16').reshape(IMG_SIZE)
+
     main_cam = mainCamera()
     main_cam.camera_open()
-    image_16 = np.frombuffer(image_16Raw, dtype='uint16').reshape(IMAG_SIZE)
-    main_cam.set_single_parameter("subarray_mode", 2)
-    main_cam.set_single_parameter("subarray_hsize", IMAG_SIZE[0])
-    main_cam.set_single_parameter("subarray_vsize", IMAG_SIZE[1])
-    main_cam.set_single_parameter("subarray_hpos", int((CAM_SIZE/2 - IMAG_SIZE[0]/2)))
-    main_cam.set_single_parameter("subarray_vpos", int((CAM_SIZE/2 - IMAG_SIZE[1]/2)))
+    main_cam.set_single_parameter("subarray_mode", 2.0)
+    main_cam.set_single_parameter("subarray_hsize", IMG_SIZE[0])
+    main_cam.set_single_parameter("subarray_vsize", IMG_SIZE[1])
+    main_cam.set_single_parameter("subarray_hpos", int((CAM_SIZE / 2 - IMG_SIZE[0] / 2)))
+    main_cam.set_single_parameter("subarray_vpos", int((CAM_SIZE / 2 - IMG_SIZE[1] / 2)))
     main_cam.set_single_parameter("sensor_mode", 12.0)
     main_cam.set_single_parameter("exposure_time", 10.0)
 
@@ -212,25 +211,30 @@ if __name__ == "__main__":
             print(main_cam.camera[par]["uname"],main_cam.camera[par]['min_value'],main_cam.camera[par]['max_value'],main_cam.camera[par]['default_value'])
 
 
-    stop_thread = threading.Thread(target=stop_live_thread)
+    stopper = threading.Event()
+
+    stop_thread = threading.Thread(target=test_stop_live_thread, args = (main_cam, stopper))
     stop_thread.daemon = True
     stop_thread.start()
 
-    live_feed = threading.Thread(target=live_feed_thread, args=(main_cam, image_16))
+    live_feed = threading.Thread(target=test_live_feed_thread, args=(main_cam, frame, stopper))
     live_feed.daemon = True
     live_feed.start()
 
     plt.ion()
     fig, ax = plt.subplots()
-    live_img = ax.imshow(image_16, cmap='gray', vmin=0, vmax = 40000)
-
+    live_img = ax.imshow(frame)
+    plt.show()
     try:
-        while 1:
-            live_img.set_data(image_16.astype("float"))
+        while not stopper.is_set():
+            live_img.set_data(frame.astype("float"))
             fig.canvas.flush_events()
             time.sleep(0.001)
     except KeyboardInterrupt:
-        print('User input interrupt...')
-
-    plt.ioff()
-    plt.show()
+        print('User interrupt...')
+    finally:
+        plt.close()
+        stopper.set()
+        stop_thread.join()
+        live_feed.join()
+        plt.ioff()

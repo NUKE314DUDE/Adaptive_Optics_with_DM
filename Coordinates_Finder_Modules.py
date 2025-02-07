@@ -3,11 +3,14 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-os.add_dll_directory(os.getcwd())
 from scipy.ndimage import gaussian_filter
 from scipy.optimize import linear_sum_assignment
 from scipy.spatial import cKDTree, KDTree
 from Zernike_Polynomials_Modules import min_circle
+os.add_dll_directory(os.getcwd())
+current_script_path = os.path.abspath(__file__)
+current_directory = os.path.dirname(current_script_path)
+os.chdir(current_directory)
 
 def closest_to_center(coordinates):
     """
