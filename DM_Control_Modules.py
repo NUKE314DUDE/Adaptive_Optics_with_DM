@@ -2,13 +2,12 @@ import time
 import numpy as np
 import ctypes
 import os.path
+import multiprocessing as mp
+from Misc_Tools import pass_filter, normalization
 os.add_dll_directory(os.getcwd())
 current_script_path = os.path.abspath(__file__)
 current_directory = os.path.dirname(current_script_path)
 os.chdir(current_directory)
-import multiprocessing as mp
-from Misc_Tools import pass_filter, normalization
-
 
 RAN = 0.25
 DOF = 57

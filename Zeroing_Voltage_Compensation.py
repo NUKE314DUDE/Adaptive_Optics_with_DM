@@ -1,8 +1,4 @@
 import os
-os.add_dll_directory(os.getcwd())
-current_script_path = os.path.abspath(__file__)
-current_directory = os.path.dirname(current_script_path)
-os.chdir(current_directory)
 import numpy as np
 import matplotlib.pyplot as plt
 import time
@@ -11,6 +7,10 @@ from ids import camera, ids_peak_ipl_extension
 from Coordinates_Finder_Modules import precise_coord, precise_coord_fixed_ref, average_distance, grid_from_proxi_center, \
     show_coord, show_coord_diff, coord_diff, grid_nodes_refine
 from Zernike_Polynomials_Modules import min_circle, image_padding_for_circular_area
+os.add_dll_directory(os.getcwd())
+current_script_path = os.path.abspath(__file__)
+current_directory = os.path.dirname(current_script_path)
+os.chdir(current_directory)
 
 def dm_reset(dof = 57, t = 2):
     init_time = time.perf_counter()

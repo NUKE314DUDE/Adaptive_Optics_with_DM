@@ -1,13 +1,13 @@
 import os
-os.add_dll_directory(os.getcwd())
-current_script_path = os.path.abspath(__file__)
-current_directory = os.path.dirname(current_script_path)
-os.chdir(current_directory)
 import numpy as np
 import matplotlib.pyplot as plt
 from Misc_Tools import frankot_chellappa, wavefront_reconstruction, show_wavefront
 from Zernike_Polynomials_Modules import show_profile, min_circle, image_padding_for_circular_area, Zernike, input_zernike
 from Coordinates_Finder_Modules import precise_coord, show_coord
+os.add_dll_directory(os.getcwd())
+current_script_path = os.path.abspath(__file__)
+current_directory = os.path.dirname(current_script_path)
+os.chdir(current_directory)
 
 if __name__ == '__main__':
 

@@ -1,12 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+from Zernike_Polynomials_Modules import min_circle, Zernike, image_padding_for_circular_area, input_zernike
+from Coordinates_Finder_Modules import precise_coord, precise_coord_fixed_ref, show_coord
 os.add_dll_directory(os.getcwd())
 current_script_path = os.path.abspath(__file__)
 current_directory = os.path.dirname(current_script_path)
 os.chdir(current_directory)
-from Zernike_Polynomials_Modules import min_circle, Zernike, image_padding_for_circular_area, input_zernike
-from Coordinates_Finder_Modules import precise_coord, precise_coord_fixed_ref, show_coord
 
 if __name__ == '__main__':
 
