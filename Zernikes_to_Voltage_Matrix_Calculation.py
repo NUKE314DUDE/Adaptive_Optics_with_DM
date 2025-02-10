@@ -14,12 +14,12 @@ if __name__ == '__main__':
     voltage_to_displace = np.load(f"Data_Deposit/range_{ran}_probe_coordinates_diff.npy")/ran
     displace_to_voltage = np.linalg.pinv(voltage_to_displace)
     reference_coord = np.load(f'Data_Deposit/range_{ran}_reference_coordinates.npy')
-    reference_circle = min_circle(reference_coord, scale = 1.6)
-    # captured_frames = np.load(f'Data_Deposit/range_{ran}_probe_captured_frames.npy')
+    reference_circle = min_circle(reference_coord, scale = 1.1)
+    # captured_frames = np.load(f'Data_Deposit/prange_{ran}_probe_captured_frames.npy')
     reference_frame = np.load(f'Data_Deposit/range_{ran}_probe_reference_image.npy')
     padded_ref_img = image_padding_for_circular_area(reference_frame, reference_circle, cut = True)
     padded_ref_coord = precise_coord(padded_ref_img)
-    padded_ref_circle = min_circle(padded_ref_coord, scale = 1.11)
+    padded_ref_circle = min_circle(padded_ref_coord, scale = 1.1)
 
     Z = Zernike()
     Zern_cof = dict()

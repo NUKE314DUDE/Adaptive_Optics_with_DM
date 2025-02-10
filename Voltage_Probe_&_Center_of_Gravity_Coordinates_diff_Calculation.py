@@ -67,10 +67,10 @@ if __name__ == "__main__":
     probe_range = 0.25
     ref_voltage, probe_voltage = deformable_mirror_single_probe_input(probe_range, degree_of_freedom=57)
     total_length = len(ref_voltage)
-    reference_image_path = f"C:/pycharm projects/Xiong_Jianxuan_Adaptive_Optics/Data_Deposit/range_{probe_range}_probe_reference_image.npy"
-    captured_frames_path = f"C:/pycharm projects/Xiong_Jianxuan_Adaptive_Optics/Data_Deposit/range_{probe_range}_probe_captured_frames.npy"
-    coordinates_diff_save_path = f"C:/pycharm projects/Xiong_Jianxuan_Adaptive_Optics/Data_Deposit/range_{probe_range}_probe_coordinates_diff.npy"
-    ref_coord_save_path = f"C:/pycharm projects/Xiong_Jianxuan_Adaptive_Optics/Data_Deposit/range_{probe_range}_reference_coordinates.npy"
+    reference_image_path = f"C:\Xiong_Jianxuan\Python_Projects\Adaptive_Optics\Data_Deposit\\range_{probe_range}_probe_reference_image.npy"
+    captured_frames_path = f"C:\Xiong_Jianxuan\Python_Projects\Adaptive_Optics\Data_Deposit\\range_{probe_range}_probe_captured_frames.npy"
+    coordinates_diff_save_path = f"C:\Xiong_Jianxuan\Python_Projects\Adaptive_Optics\Data_Deposit\\range_{probe_range}_probe_coordinates_diff.npy"
+    ref_coord_save_path = f"C:\Xiong_Jianxuan\Python_Projects\Adaptive_Optics\Data_Deposit\\range_{probe_range}_reference_coordinates.npy"
 
     # Get the reference image & the reference coordinates
     dm.Send(ref_voltage)
@@ -85,9 +85,6 @@ if __name__ == "__main__":
     current_frame = None
     current_coordinates = None
     for i, j in enumerate(probe_voltage):
-        # dm.Send(j)
-        # time.sleep(0.1)
-        # current_frame = camera_snapshot()
         current_frame = camera_snapshot(j)
         captured_frames.append(current_frame)
         current_coordinates = precise_coord_fixed_ref(current_frame, ref_coord)

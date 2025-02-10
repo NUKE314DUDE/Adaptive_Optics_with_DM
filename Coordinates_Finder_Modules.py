@@ -88,7 +88,7 @@ def grid_nodes_refine(grid_coord, ref_coord, get_rotation = False):
         rotation = np.array(Vt.T @ U.T)
     final_grid_coord = centered_grid_coord @ rotation
     angle = np.arccos(rotation[0, 0])
-    # print(f"grid is rotated by {angle} rad.")
+    print(f"grid is rotated by {angle} rad.")
     if get_rotation:
         return np.array(final_grid_coord + grid_center), rotation
     else:

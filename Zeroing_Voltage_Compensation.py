@@ -72,12 +72,12 @@ if __name__ == "__main__":
     voltage_to_coord = np.load(f"Data_Deposit/range_{ran}_probe_coordinates_diff.npy")/ran
     coord_to_voltage = np.linalg.pinv(voltage_to_coord)
     reference_coord = np.load(f'Data_Deposit/range_{ran}_reference_coordinates.npy')
-    reference_circle = min_circle(reference_coord, scale = 1.25)
-    captured_frames = np.load(f'Data_Deposit/range_{ran}_probe_captured_frames.npy')
+    reference_circle = min_circle(reference_coord, scale = 1.05)
+    # captured_frames = np.load(f'Data_Deposit/range_{ran}_probe_captured_frames.npy')
     reference_frame = np.load(f'Data_Deposit/range_{ran}_probe_reference_image.npy')
     padded_ref_img = image_padding_for_circular_area(reference_frame, reference_circle, cut = True)
     padded_ref_coord = precise_coord(padded_ref_img)
-    padded_ref_circle = min_circle(padded_ref_coord, scale = 1.1)
+    padded_ref_circle = min_circle(padded_ref_coord, scale = 1.05)
 
     # Define and optimiza towards ideal grid
     grid_nodes = grid_from_proxi_center(padded_ref_coord, avg_mode = False)
@@ -109,6 +109,7 @@ if __name__ == "__main__":
             break
 
     show_coord_diff(current_frame, grid_nodes, current_coord)
+    print(voltage_carrier)
     np.save(f'Data_Deposit/zeroing_compensation_voltage.npy', voltage_carrier)
 
     camera.stop_acquisition()
