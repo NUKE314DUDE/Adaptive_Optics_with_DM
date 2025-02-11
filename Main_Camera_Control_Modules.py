@@ -235,6 +235,7 @@ if __name__ == "__main__":
     finally:
         plt.close()
         stopper.set()
+        stopper.clear()
         stop_thread.join()
         live_feed.join()
         plt.ioff()

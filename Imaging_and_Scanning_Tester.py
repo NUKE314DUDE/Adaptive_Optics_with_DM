@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import nidaqmx
 from nidaqmx.constants import AcquisitionType, FrequencyUnits, Level, Slope, TriggerType
 from nidaqmx.errors import DaqError
+from torch.utils.benchmark.op_fuzzers.spectral import MIN_DIM_SIZE
+
 from Main_Camera_Control_Modules import mainCamera, test_live_feed_thread, test_stop_live_thread
 from multiprocessing.sharedctypes import RawArray
 from DM_Control_Modules import AlPaoDM, smoothed_sawtooth
@@ -98,16 +100,27 @@ if __name__ == '__main__':
     main_cam.set_single_parameter("subarray_vsize", IMG_SIZE[1])
     main_cam.set_single_parameter("subarray_hpos", int((CAM_SIZE / 2 - IMG_SIZE[0] / 2)))
     main_cam.set_single_parameter("subarray_vpos", int((CAM_SIZE / 2 - IMG_SIZE[1] / 2)))
+    main_cam.set_single_parameter("exposure_time", 10.0) # Units in ms
+
     main_cam.set_single_parameter("sensor_mode", 12.0)
-    main_cam.set_single_parameter("exposure_time", 10.0)
+    main_cam.set_single_parameter("readout_direction", 1)
+    main_cam.set_single_parameter("trigger_polarity", 2)
+    main_cam.set_single_parameter("trigger_source", 1)
+    main_cam.set_single_parameter("internal_line_interval", 10*1e-6)
+
 
     DM = AlPaoDM()
+    AMP = 0.7
+    SIG_FREQ = 200
 
-    amp_modulation = smoothed_sawtooth(cut_freq_low = 10000, sig_freq = 200)
+    amp_modulation = smoothed_sawtooth(cut_freq_low = 10000, sig_freq = SIG_FREQ)
     seq_length = len(amp_modulation)
     seq = np.zeros((27, seq_length))
-    seq[2] = amp_modulation
+    seq[3] = AMP * amp_modulation
     DM.send_zernike_patterns(seq, repeat = 0)
+
+    trigger = MainCameraTrigger()
+    trigger.start_trigger(SIG_FREQ, 0.8)
 
     main_cam.start_live()
 
@@ -134,6 +147,7 @@ if __name__ == '__main__':
     finally:
         plt.close()
         stopper.set()
+        stopper.clear()
         live_feed.join()
         stop_thread.join()
         DM.stop_loop()
