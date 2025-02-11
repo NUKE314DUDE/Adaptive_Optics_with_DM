@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 import nidaqmx
 from nidaqmx.constants import AcquisitionType, FrequencyUnits, Level, Slope, TriggerType
 from nidaqmx.errors import DaqError
-from torch.utils.benchmark.op_fuzzers.spectral import MIN_DIM_SIZE
 
 from Main_Camera_Control_Modules import mainCamera, test_live_feed_thread, test_stop_live_thread
 from multiprocessing.sharedctypes import RawArray
