@@ -109,8 +109,8 @@ if __name__ == "__main__":
             break
 
     show_coord_diff(current_frame, grid_nodes, current_coord)
-    print(voltage_carrier)
-    np.save(f'Data_Deposit/zeroing_compensation_voltage.npy', voltage_carrier)
+    print(np.max(np.abs(voltage_carrier)))
+    # np.save(f'Data_Deposit/zeroing_compensation_voltage.npy', voltage_carrier)
 
     camera.stop_acquisition()
     camera.close()
