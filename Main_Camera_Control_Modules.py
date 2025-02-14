@@ -8,7 +8,7 @@ import nidaqmx
 from nidaqmx.constants import AcquisitionType, FrequencyUnits, Level, Slope, TriggerType, TimeUnits
 from nidaqmx.errors import DaqError
 
-## credit to Vipin Balan ##
+## credit to Paolo Pozzi & Vipin Balan##
 
 class MainCameraTrigger:
     def __init__(self):
@@ -100,7 +100,7 @@ def test_live_feed_thread(cam, img, stop_event):
             print(f"Error test live feed thread: {e}")
             break
 
-class mainCamera:
+class MainCamera:
     def __init__(self):
         self.number_of_frames = None
         self.camera = None
@@ -109,7 +109,7 @@ class mainCamera:
         self.tstream = None
         self.frame = None
         self.last_frame_idx = None
-        self.frame_size = (2048, 2048)
+        self.frame_size = ()
 
     def camera_open(self):
         try:
@@ -262,7 +262,7 @@ if __name__ == "__main__":
     image_16Raw = RawArray('H', IMG_SIZE[0] * IMG_SIZE[1])
     frame = np.frombuffer(image_16Raw, dtype='uint16').reshape(IMG_SIZE)
 
-    main_cam = mainCamera()
+    main_cam = MainCamera()
     main_cam.camera_open()
     main_cam.set_single_parameter("subarray_mode", 2.0)
     main_cam.set_single_parameter("subarray_hsize", IMG_SIZE[0])

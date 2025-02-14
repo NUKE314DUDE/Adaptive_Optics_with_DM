@@ -1,9 +1,9 @@
 import os
 import time
 import numpy as np
-import threading
 import matplotlib.pyplot as plt
-from Main_Camera_Control_Modules import mainCamera, test_live_feed_thread, test_stop_live_thread, MainCameraTrigger
+import multiprocessing as mp
+from Main_Camera_Control_Modules import MainCamera, MainCameraTrigger
 from multiprocessing.sharedctypes import RawArray
 from DM_Control_Modules import AlPaoDM, smoothed_sawtooth
 os.add_dll_directory(os.getcwd())
@@ -11,137 +11,124 @@ current_script_path = os.path.abspath(__file__)
 current_directory = os.path.dirname(current_script_path)
 os.chdir(current_directory)
 
-# class MainCameraTrigger:
-#     def __init__(self):
-#         self.NI_input_task = None
-#         self.NI_output_task = None
-#         self.NI_input = '/Dev1/pfi3'
-#         self.NI_output = '/Dev1/ctr0'
-#         self.min_delay = 25e-9
-#         self.max_delay = 53.7
-#
-#     def start_trigger(self, delay, DM_freq):
-#         try:
-#             if self.NI_input_task or self.NI_output_task is not None:
-#                 self.NI_input_task.stop()
-#                 self.NI_input_task.close()
-#                 self.NI_input_task = None
-#                 self.NI_output_task.stop()
-#                 self.NI_output_task.close()
-#                 self.NI_output_task = None
-#
-#             delay = min(max(delay, self.min_delay), min(self.max_delay, 1 / DM_freq))
-#
-#             self.NI_input_task = nidaqmx.Task()
-#
-#             self.NI_input_task.di_channels.add_di_chan(
-#                 self.NI_input,
-#                 name_to_assign_to_lines = "DM Trigger Input"
-#             )
-#
-#
-#             self.NI_output_task = nidaqmx.Task()
-#             self.NI_output_task.co_channels.add_co_pulse_chan_time(
-#                 counter = self.NI_output,
-#                 name_to_assign_to_channel = "MainCmera NI Trigger",
-#                 units = TimeUnits.SECONDS,
-#                 idle_state = Level.LOW,
-#                 initial_delay = delay,
-#                 low_time = 1e-7,
-#                 high_time = 1e-7
-#             )
-#
-#             self.NI_output_task.triggers.start_trigger.cfg_dig_edge_start_trig(
-#                 trigger_source = self.NI_input,
-#                 trigger_edge = Slope.RISING
-#             )
-#
-#             self.NI_output_task.triggers.start_trigger.retriggerable = True
-#
-#             self.NI_input_task.start()
-#             self.NI_output_task.start()
-#
-#         except DaqError as e:
-#             print(f'NI-DAQmx Error: {e}')
-#             self.stop_trigger()
-#
-#         except ValueError as e:
-#             print(f'Parameter Error: {e}')
-#         except Exception as e:
-#             print(f'Unexpected Error: {e}')
-#
-#     def stop_trigger(self):
-#         if self.NI_input_task or self.NI_output_task is not None:
-#             self.NI_input_task.stop()
-#             self.NI_input_task.close()
-#             self.NI_input_task = None
-#             self.NI_output_task.stop()
-#             self.NI_output_task.close()
-#             self.NI_output_task = None
+CONFIG = {
+    "DM" : {
+        "zernike_order" : 3,
+        "amp" : 0.95,
+        "signal_freq" : 60,
+        "sawtooth_params" : {
+            "cut_freq_low" : 640,
+            "cut_freq_high" : None,
+            "fill" : 0.95
+        }
+    },
+    "camera" : {
+        "camera_size" : 2304,
+        "subarray_mode" : 2.0,
+        "subarray_size" : (1024, 1024),
+        "sensor_mode" : 12.0,
+        "exposure_time" : 1, # ms
+        "trigger_source" : 2,
+        "trigger_polarity" : 2,
+        "trigger_delay" : 8e-6,
+        "internal_line_interval" : 1*1e-6
+    }
+}
 
-if __name__ == '__main__':
-    CAM_SIZE = 2304
-    IMG_SIZE = (1024, 1024)
-    live_frame_raw = RawArray('H', IMG_SIZE[0] * IMG_SIZE[1])
-    live_frame = np.frombuffer(live_frame_raw, dtype='uint16').reshape(IMG_SIZE)
-
-    main_cam = mainCamera()
-    main_cam.camera_open()
-    main_cam.set_single_parameter("subarray_mode", 2.0)
-    main_cam.set_single_parameter("subarray_hsize", IMG_SIZE[0])
-    main_cam.set_single_parameter("subarray_vsize", IMG_SIZE[1])
-    main_cam.set_single_parameter("subarray_hpos", int((CAM_SIZE / 2 - IMG_SIZE[0] / 2)))
-    main_cam.set_single_parameter("subarray_vpos", int((CAM_SIZE / 2 - IMG_SIZE[1] / 2)))
-    main_cam.set_single_parameter("sensor_mode", 12.0)
-    main_cam.set_single_parameter("exposure_time", 10.0)
-
-    main_cam.set_single_parameter("trigger_polarity", 2.)
-    main_cam.set_single_parameter("trigger_mode", 1.)
-    main_cam.set_single_parameter("trigger_source", 2)
-    main_cam.set_single_parameter("internal_line_interval", 1*1e-7)
-
-
-    # DM = AlPaoDM()
-    # AMP = 0.9
-    SIG_FREQ = 100
-    #
-    # amp_modulation = smoothed_sawtooth(cut_freq_low = 640, sig_freq = SIG_FREQ)
-    # seq_length = len(amp_modulation)
-    # seq = np.zeros((27, seq_length))
-    # seq[3] = AMP * amp_modulation
-    # DM.send_zernike_patterns(seq, repeat = 0)
-
-    main_cam.start_live()
-
-    trigger = MainCameraTrigger()
-    trigger.start_trigger(0.001, SIG_FREQ)
-
-
-    stopper = threading.Event()
-
-    live_feed = threading.Thread(target = test_live_feed_thread, args = (main_cam, live_frame, stopper))
-    live_feed.daemon = True; live_feed.start()
-
-    stop_thread = threading.Thread(target = test_stop_live_thread, args = (main_cam, stopper))
-    stop_thread.daemon = True; stop_thread.start()
-
-    fig = plt.figure(figsize = (10, 6.18))
-    ax = fig.add_subplot(1,1,1)
-    monitor = ax.imshow(live_frame)
-    plt.ion()
-    plt.show()
+def dm_control_process():
 
     try:
-        while not stopper.is_set():
-            monitor.set_data(live_frame.astype('float'))
-            fig.canvas.flush_events()
-    except KeyboardInterrupt:
-        print("User interrupt")
+
+        amp_modulation = smoothed_sawtooth(
+            fill = CONFIG["DM"]["sawtooth_params"]["fill"],
+            cut_freq_low = CONFIG["DM"]["sawtooth_params"]["cut_freq_low"],
+            cut_freq_high = CONFIG["DM"]["sawtooth_params"]["cut_freq_high"],
+            sig_freq = CONFIG["DM"]["signal_freq"]
+        )
+
+        dm_sequence = np.zeros((27, len(amp_modulation)))
+        dm_sequence[CONFIG["dm"]["zernike_order"]] = CONFIG["dm"]["amp"] * amp_modulation
+
+        dm = AlPaoDM()
+        dm.send_zernike_patterns(dm_sequence, repeat = 0)
+        print("DM sequence initiated...")
+
+        while 1:
+            time.sleep(1)
+
+    except Exception as e:
+        print(f"Error in DM sequence: {e}")
+
+def camera_control_process(frame_queue: mp.Queue):
+
+    try:
+
+        cam = MainCamera()
+        cam.camera_open()
+
+        cam.set_single_parameter("subarray_mode", CONFIG["camera"]["subarray_mode"])
+        cam.set_single_parameter("subarray_hsize", CONFIG["camera"]["subarray_size"][0])
+        cam.set_single_parameter("subarray_vsize", CONFIG["camera"]["subarray_size"][1])
+        cam.set_single_parameter("subarray_hpos", int((CONFIG["camera"]["camera_size"] / 2 - CONFIG["camera"]["subarray_size"][0] / 2)))
+        cam.set_single_parameter("subarray_vpos", int((CONFIG["camera"]["camera_size"] / 2 - CONFIG["camera"]["subarray_size"][1] / 2)))
+        cam.set_single_parameter("sensor_mode", CONFIG["camera"]["sensor_mode"])
+        cam.set_single_parameter("exposure_time", CONFIG["camera"]["exposure_time"])
+        cam.set_single_parameter("trigger_source", CONFIG["camera"]["trigger_source"])
+        cam.set_single_parameter("trigger_polarity", CONFIG["camera"]["trigger_polarity"])
+        cam.set_single_parameter("internal_line_interval", CONFIG["camera"]["internal_line_interval"])
+
+        camera_trigger = MainCameraTrigger()
+        camera_trigger.start_trigger(CONFIG["camera"]["trigger_delay"], CONFIG["DM"]["signal_freq"])
+
+        cam.start_live()
+        print("Camera initiated")
+
+        plt.ion()
+        fig, ax = plt.subplots()
+        display = ax.imshow(np.zeros(CONFIG["camera"]["subarray_size"]), cmaps = 'gray')
+        plt.show()
+
+        while 1:
+            t = time.perf_counter()
+            frame = cam.get_last_live_frame()
+            if frame is not None:
+                frame_queue.put(frame)
+                display.set_data(frame.astype('float'))
+                fig.canvas.flush_events()
+            print(f"Frame rate is: {1/(time.perf_counter() - t)}")
+            time.sleep(0.001)
+
+    except Exception as e:
+        print(f"Error in camera live: {e}")
+
     finally:
         plt.close()
-        stopper.set()
-        live_feed.join()
-        stop_thread.join()
-        # stopper.clear()
-        DM.stop_loop()
         plt.ioff()
+        cam.stop_live()
+        camera_trigger.stop_trigger()
+
+if __name__ == '__main__':
+
+    frame_queue = mp.Queue(maxsize = 10)
+
+    try:
+
+        dm_thread = mp.Process(target = dm_control_process)
+        dm_thread.start()
+        print("DM sequence running...")
+
+        time.sleep(0.1)
+
+        cam_thread = mp.Process(target = camera_control_process, args = (frame_queue, ))
+        cam_thread.start()
+        print("Camera live recording...")
+
+        while 1:
+            time.sleep(1)
+
+    except KeyboardInterrupt:
+        print("Shutting down...")
+
+    finally:
+        dm_thread.terminate()
+        cam_thread.terminate()
