@@ -19,7 +19,9 @@ class MainCameraTrigger:
         self.min_delay = 25e-9
         self.max_delay = 53.7
 
-    def start_trigger(self, delay, DM_freq):
+    def start_trigger(self, delay, DM_freq = None):
+        if DM_freq is None:
+            DM_freq = 80e6
         try:
             if self.NI_input_task or self.NI_output_task is not None:
                 self.NI_input_task.stop()
