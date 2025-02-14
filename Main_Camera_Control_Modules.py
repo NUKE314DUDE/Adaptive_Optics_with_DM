@@ -21,7 +21,7 @@ class MainCameraTrigger:
 
     def start_trigger(self, delay, DM_freq = None):
         if DM_freq is None:
-            DM_freq = 80e6
+            DM_freq = 1e3
         try:
             if self.NI_input_task or self.NI_output_task is not None:
                 self.NI_input_task.stop()
@@ -109,7 +109,7 @@ class MainCamera:
         self.tstream = None
         self.frame = None
         self.last_frame_idx = None
-        self.frame_size = ()
+        self.frame_size = (0, 0)
 
     def camera_open(self):
         try:
@@ -282,7 +282,6 @@ if __name__ == "__main__":
             print(main_cam.camera[par]["uname"],main_cam.camera[par]['enum_values'],main_cam.camera[par]['default_value'])
         else:
             print(main_cam.camera[par]["uname"],main_cam.camera[par]['min_value'],main_cam.camera[par]['max_value'],main_cam.camera[par]['default_value'])
-
 
     stopper = threading.Event()
 
