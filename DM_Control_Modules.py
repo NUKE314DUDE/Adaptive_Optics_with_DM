@@ -24,8 +24,8 @@ def smoothed_sawtooth(fill = 0.95, cut_freq_low = None, cut_freq_high = None, si
     :param dm_sample_duration:
     :return: normalized and smoothed sawtooth signal
     """
-    if sig_freq is None: sig_freq = 1000
-    if dm_sample_duration is None: dm_sample_duration = 6.67e-6
+    if sig_freq is None: sig_freq = 640
+    if dm_sample_duration is None: dm_sample_duration = 5e-7# 6.67e-6
     sig_length = int(np.ceil((1 / sig_freq) / dm_sample_duration))
     l1 = int(np.ceil(fill * sig_length)); l2 = sig_length - l1
     l1 = l1 + 1 + l1%2; l2 = l2 + 1 + l2%2
@@ -47,7 +47,7 @@ def alpao_loop_single(sequence_raw, stop_raw):
     lib = ctypes.cdll.LoadLibrary('Lib64/ASDK.dll')
     lib.asdkInit.restype = ctypes.POINTER(ctypes.c_void_p)
     asdk_dm = lib.asdkInit(SN.encode("utf-8"))
-    lib.asdkSet(asdk_dm, "daqFreq".encode("utf-8"), ctypes.c_double(20000000.0))
+    lib.asdkSet(asdk_dm, "daqFreq".encode("utf-8"), ctypes.c_double(20*1e6))
     lib.asdkSet(asdk_dm, "SyncMode".encode("utf-8"), ctypes.c_double(1.0))
 
     stop = np.frombuffer(stop_raw, dtype="uint32")
@@ -85,7 +85,7 @@ def alpao_loop_sequence(sequence_raw, length_raw, repeats_raw, stop_raw, trigger
     lib = ctypes.cdll.LoadLibrary('Lib64/ASDK.dll')
     lib.asdkInit.restype = ctypes.POINTER(ctypes.c_void_p)
     asdk_dm = lib.asdkInit(SN.encode("utf-8"))
-    lib.asdkSet(asdk_dm, "daqFreq".encode("utf-8"), ctypes.c_double(20000000.0))
+    lib.asdkSet(asdk_dm, "daqFreq".encode("utf-8"), ctypes.c_double(20*1e6))
     lib.asdkSet(asdk_dm, "SyncMode".encode("utf-8"), ctypes.c_double(1.0))
     lib.asdkSet(asdk_dm, "Timeout".encode("utf-8"), ctypes.c_double(60.0))
     lib.asdkSet(asdk_dm, "TriggerIn".encode("utf-8"), ctypes.c_double(trigger_in))
@@ -176,7 +176,7 @@ class AlPaoDM:
 
     def send_direct_zernike(self, zernike_orders):
         voltages = np.einsum('ij, ik -> jk', self.zern_to_volt, zernike_orders)
-        self.patterns[:, :] = np.array(voltages).T
+        self.patterns[:, :] = np.array(voltages + self.zero_compensation_voltage).T
 
     def stop_loop(self):
         if self.stop is not None:
