@@ -45,8 +45,9 @@ class DMCameraSync:
         self.Camera = MainCamera()
         self.CameraTrigger = MainCameraTrigger()
         self.running = False
-        self.frame_queue = queue.Queue(maxsize = 3)
+        self.frame_queue = queue.Queue(maxsize = 4)
         self.last_frame = None
+        self.last_update_time = time.time()
         self.display_range = [0, 65535]
 
     def dm_control_thread(self, stop_event):
@@ -60,7 +61,7 @@ class DMCameraSync:
             )
 
             dm_sequence = np.zeros((27, len(amp_modulation)))
-            dm_sequence[CONFIG["dm"]["zernike_order"]] = CONFIG["dm"]["amp"] * amp_modulation
+            dm_sequence[CONFIG["DM"]["zernike_order"]] = CONFIG["DM"]["amp"] * amp_modulation
 
             self.DM.send_zernike_patterns(dm_sequence, repeat=0)
             print("DM sequence initiated...")
@@ -120,13 +121,14 @@ class DMCameraSync:
                     if frame_counter % 10 == 0:
 
                         fps = frame_counter/(time.time() - start_time)
-                        print(f"Current camera fps: {round(fps)} FPS")
+                        print(f"Current camera fps: {fps:.2f} FPS")
                         frame_counter = 0
                         start_time = time.time()
 
                     try:
+                        self.frame_queue.get_nowait()
                         self.frame_queue.put_nowait(frame)
-                    except self.frame_queue.full():
+                    except queue.Empty:
                         pass
 
                 time.sleep(1 / CONFIG["camera"]["max_frame_rate"])
@@ -140,6 +142,9 @@ class DMCameraSync:
             print("Camera closed...")
 
     def update_display(self, frame):
+        current_time = time.time()
+        print(f"Refresh gap = {current_time - self.last_update_time:.3f} s")
+        self.last_update_time = current_time
         if frame is not None:
             self.last_frame = frame
         if self.last_frame is not None:
@@ -154,12 +159,14 @@ class DMCameraSync:
 
         dm_thread = threading.Thread(target =self.dm_control_thread, args = (stop_event, ))
         camera_thread = threading.Thread(target = self.camera_control_thread, args = (stop_event, ))
+        monitor_thread = threading.Thread(target = self._thread_monitor, args = (dm_thread, camera_thread))
 
-        dm_thread.daemon = True; camera_thread.daemon = True
+        dm_thread.daemon = True; camera_thread.daemon = True; monitor_thread.daemon = True
 
         dm_thread.start()
         time.sleep(1)
         camera_thread.start()
+        monitor_thread.start()
 
         plt.ion()
         self.fig, self.ax = plt.subplots()
@@ -175,9 +182,10 @@ class DMCameraSync:
         self.ani = FuncAnimation(
             self.fig,
             self.update_display,
-            frames = self.frame_generator,
+            frames = self._frame_generator,
             interval = 10, # ms
-            blit = True
+            blit = True,
+            cache_frame_data = False
         )
 
         def on_key(event):
@@ -189,18 +197,30 @@ class DMCameraSync:
             return None
 
         self.fig.canvas.mpl_connect("key_press_event", lambda event: on_key(event) or None)
-        plt.show()
+        plt.show(block = False)
+
+        while self.running:
+            self.fig.canvas.flush_events()
+            time.sleep(0.01)
 
         dm_thread.join(); camera_thread.join()
         print("Resource released...")
 
-    def frame_generator(self):
+    def _frame_generator(self):
+        print("Frame generator started...")
         while self.running:
             try:
                 frame = self.frame_queue.get_nowait()
+                print(f"Frame grabbed with shape: {frame.shape}, data range: {np.min(frame)} to {np.max(frame)}")
                 yield frame
-            except self.frame_queue.empty():
+            except queue.Empty:
+                print("Frame Queue is empty.")
                 yield None
+
+    def _thread_monitor(self, dm_thread = None, camera_thread = None):
+        while self.running:
+            print(f"Thread status: DM[{dm_thread.is_alive}], Camera[{camera_thread.is_alive()}]")
+            time.sleep(1)
 
 if __name__ == '__main__':
     controller = DMCameraSync()
