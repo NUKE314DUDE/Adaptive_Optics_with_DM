@@ -1,10 +1,12 @@
 import os
+import queue
+import threading
 import time
 import numpy as np
 import matplotlib.pyplot as plt
 import multiprocessing as mp
+from matplotlib.animation import FuncAnimation
 from Main_Camera_Control_Modules import MainCamera, MainCameraTrigger
-from multiprocessing.sharedctypes import RawArray
 from DM_Control_Modules import AlPaoDM, smoothed_sawtooth
 os.add_dll_directory(os.getcwd())
 current_script_path = os.path.abspath(__file__)
@@ -31,104 +33,175 @@ CONFIG = {
         "trigger_source" : 2,
         "trigger_polarity" : 2,
         "trigger_delay" : 8e-6,
-        "internal_line_interval" : 1*1e-6
+        "internal_line_interval" : 1*1e-6,
+        "auto_range" : False,
+        "max_frame_rate" : 1000
     }
 }
 
-def dm_control_process():
+class DMCameraSync:
+    def __init__(self):
+        self.DM = AlPaoDM()
+        self.Camera = MainCamera()
+        self.CameraTrigger = MainCameraTrigger()
+        self.running = False
+        self.frame_queue = queue.Queue(maxsize = 3)
+        self.last_frame = None
+        self.display_range = [0, 65535]
 
-    try:
+    def dm_control_thread(self, stop_event):
+        try:
 
-        amp_modulation = smoothed_sawtooth(
-            fill = CONFIG["DM"]["sawtooth_params"]["fill"],
-            cut_freq_low = CONFIG["DM"]["sawtooth_params"]["cut_freq_low"],
-            cut_freq_high = CONFIG["DM"]["sawtooth_params"]["cut_freq_high"],
-            sig_freq = CONFIG["DM"]["signal_freq"]
-        )
+            amp_modulation = smoothed_sawtooth(
+                fill=CONFIG["DM"]["sawtooth_params"]["fill"],
+                cut_freq_low=CONFIG["DM"]["sawtooth_params"]["cut_freq_low"],
+                cut_freq_high=CONFIG["DM"]["sawtooth_params"]["cut_freq_high"],
+                sig_freq=CONFIG["DM"]["signal_freq"]
+            )
 
-        dm_sequence = np.zeros((27, len(amp_modulation)))
-        dm_sequence[CONFIG["dm"]["zernike_order"]] = CONFIG["dm"]["amp"] * amp_modulation
+            dm_sequence = np.zeros((27, len(amp_modulation)))
+            dm_sequence[CONFIG["dm"]["zernike_order"]] = CONFIG["dm"]["amp"] * amp_modulation
 
-        dm = AlPaoDM()
-        dm.send_zernike_patterns(dm_sequence, repeat = 0)
-        print("DM sequence initiated...")
+            self.DM.send_zernike_patterns(dm_sequence, repeat=0)
+            print("DM sequence initiated...")
 
-        while 1:
-            time.sleep(1)
+            while not stop_event.is_set():
+                time.sleep(0.001)
 
-    except Exception as e:
-        print(f"Error in DM sequence: {e}")
+        except Exception as e:
+            print(f"Error in DM thread: {str(e)}")
 
-def camera_control_process(frame_queue: mp.Queue):
+        finally:
+            self.DM.stop_loop()
+            print("DM closed...")
 
-    try:
 
-        cam = MainCamera()
-        cam.camera_open()
+    def camera_control_thread(self, stop_event):
+        try:
+            self.Camera.camera_open()
 
-        cam.set_single_parameter("subarray_mode", CONFIG["camera"]["subarray_mode"])
-        cam.set_single_parameter("subarray_hsize", CONFIG["camera"]["subarray_size"][0])
-        cam.set_single_parameter("subarray_vsize", CONFIG["camera"]["subarray_size"][1])
-        cam.set_single_parameter("subarray_hpos", int((CONFIG["camera"]["camera_size"] / 2 - CONFIG["camera"]["subarray_size"][0] / 2)))
-        cam.set_single_parameter("subarray_vpos", int((CONFIG["camera"]["camera_size"] / 2 - CONFIG["camera"]["subarray_size"][1] / 2)))
-        cam.set_single_parameter("sensor_mode", CONFIG["camera"]["sensor_mode"])
-        cam.set_single_parameter("exposure_time", CONFIG["camera"]["exposure_time"])
-        cam.set_single_parameter("trigger_source", CONFIG["camera"]["trigger_source"])
-        cam.set_single_parameter("trigger_polarity", CONFIG["camera"]["trigger_polarity"])
-        cam.set_single_parameter("internal_line_interval", CONFIG["camera"]["internal_line_interval"])
+            self.Camera.set_single_parameter("subarray_mode", CONFIG["camera"]["subarray_mode"])
+            self.Camera.set_single_parameter("subarray_hsize", CONFIG["camera"]["subarray_size"][0])
+            self.Camera.set_single_parameter("subarray_vsize", CONFIG["camera"]["subarray_size"][1])
+            self.Camera.set_single_parameter("subarray_hpos",
+                                     int((CONFIG["camera"]["camera_size"] / 2 - CONFIG["camera"]["subarray_size"][0] / 2)))
+            self.Camera.set_single_parameter("subarray_vpos",
+                                     int((CONFIG["camera"]["camera_size"] / 2 - CONFIG["camera"]["subarray_size"][1] / 2)))
+            self.Camera.set_single_parameter("sensor_mode", CONFIG["camera"]["sensor_mode"])
+            self.Camera.set_single_parameter("exposure_time",
+                                             min(CONFIG["camera"]["exposure_time"], (1/CONFIG["DM"]["signal_freq"]) - CONFIG["camera"]["trigger_delay"]
+                                                 - 4*1e-7))
 
-        camera_trigger = MainCameraTrigger()
-        camera_trigger.start_trigger(CONFIG["camera"]["trigger_delay"], CONFIG["DM"]["signal_freq"])
+            if CONFIG["camera"]["exposure_time"] > ((1/CONFIG["DM"]["signal_freq"]) - CONFIG["camera"]["trigger_delay"]
+                                                 - 4*1e-7): print("Camera is missing triggers, lower the exposure!")
 
-        cam.start_live()
-        print("Camera initiated")
+            self.Camera.set_single_parameter("trigger_source", CONFIG["camera"]["trigger_source"])
+            self.Camera.set_single_parameter("trigger_polarity", CONFIG["camera"]["trigger_polarity"])
+            self.Camera.set_single_parameter("internal_line_interval", CONFIG["camera"]["internal_line_interval"])
+
+            self.CameraTrigger.start_trigger(CONFIG["camera"]["trigger_delay"], CONFIG["DM"]["signal_freq"])
+
+            self.Camera.start_live()
+            print("Camera initiated...")
+
+            frame_counter = 0
+            start_time = time.time()
+
+            while not stop_event.is_set():
+                frame = self.Camera.get_last_live_frame()
+                if frame is not None:
+                    if CONFIG["camera"]["auto_range"]:
+
+                        frame_min = np.min(frame); frame_max = np.max(frame)
+                        self.display_range = [frame_min - 0.1 * (frame_max - frame_min),
+                                              frame_max + 0.1 * (frame_max - frame_min)]
+
+                    frame_counter += 1
+                    if frame_counter % 10 == 0:
+
+                        fps = frame_counter/(time.time() - start_time)
+                        print(f"Current camera fps: {round(fps)} FPS")
+                        frame_counter = 0
+                        start_time = time.time()
+
+                    try:
+                        self.frame_queue.put_nowait(frame)
+                    except self.frame_queue.full():
+                        pass
+
+                time.sleep(1 / CONFIG["camera"]["max_frame_rate"])
+
+        except Exception as e:
+            print(f"Error in camera sampling: {str(e)}")
+
+        finally:
+            self.Camera.camera_close()
+            self.CameraTrigger.stop_trigger()
+            print("Camera closed...")
+
+    def update_display(self, frame):
+        if frame is not None:
+            self.last_frame = frame
+        if self.last_frame is not None:
+            self.im.set_data(self.last_frame)
+            self.im.set_clim(*self.display_range)
+        return [self.im]
+
+    def start(self):
+
+        self.running = True
+        stop_event = mp.Event()
+
+        dm_thread = threading.Thread(target =self.dm_control_thread, args = (stop_event, ))
+        camera_thread = threading.Thread(target = self.camera_control_thread, args = (stop_event, ))
+
+        dm_thread.daemon = True; camera_thread.daemon = True
+
+        dm_thread.start()
+        time.sleep(1)
+        camera_thread.start()
 
         plt.ion()
-        fig, ax = plt.subplots()
-        display = ax.imshow(np.zeros(CONFIG["camera"]["subarray_size"]), cmaps = 'gray')
+        self.fig, self.ax = plt.subplots()
+        self.im = self.ax.imshow(
+            np.zeros((CONFIG["camera"]["subarray_size"])),
+            cmap = "gray",
+            vmin = self.display_range[0],
+            vmax = self.display_range[1]
+        )
+        self.ax.set_title("Camera Feed")
+        plt.tight_layout()
+
+        self.ani = FuncAnimation(
+            self.fig,
+            self.update_display,
+            frames = self.frame_generator,
+            interval = 10, # ms
+            blit = True
+        )
+
+        def on_key(event):
+            if event.key == "x":
+                print("Shutting down...")
+                stop_event.set()
+                self.running = False
+                plt.close()
+            return None
+
+        self.fig.canvas.mpl_connect("key_press_event", lambda event: on_key(event) or None)
         plt.show()
 
-        while 1:
-            t = time.perf_counter()
-            frame = cam.get_last_live_frame()
-            if frame is not None:
-                frame_queue.put(frame)
-                display.set_data(frame.astype('float'))
-                fig.canvas.flush_events()
-            print(f"Frame rate is: {1/(time.perf_counter() - t)}")
-            time.sleep(0.001)
+        dm_thread.join(); camera_thread.join()
+        print("Resource released...")
 
-    except Exception as e:
-        print(f"Error in camera live: {e}")
-
-    finally:
-        plt.close()
-        plt.ioff()
-        cam.stop_live()
-        camera_trigger.stop_trigger()
+    def frame_generator(self):
+        while self.running:
+            try:
+                frame = self.frame_queue.get_nowait()
+                yield frame
+            except self.frame_queue.empty():
+                yield None
 
 if __name__ == '__main__':
-
-    frame_queue = mp.Queue(maxsize = 10)
-
-    try:
-
-        dm_thread = mp.Process(target = dm_control_process)
-        dm_thread.start()
-        print("DM sequence running...")
-
-        time.sleep(0.1)
-
-        cam_thread = mp.Process(target = camera_control_process, args = (frame_queue, ))
-        cam_thread.start()
-        print("Camera live recording...")
-
-        while 1:
-            time.sleep(1)
-
-    except KeyboardInterrupt:
-        print("Shutting down...")
-
-    finally:
-        dm_thread.terminate()
-        cam_thread.terminate()
+    controller = DMCameraSync()
+    controller.start()
