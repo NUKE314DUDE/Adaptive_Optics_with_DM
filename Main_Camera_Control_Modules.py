@@ -44,7 +44,7 @@ class MainCameraTrigger:
             self.NI_output_task = nidaqmx.Task()
             self.NI_output_task.co_channels.add_co_pulse_chan_time(
                 counter = self.NI_output,
-                name_to_assign_to_channel = "MainCmera NI Trigger",
+                name_to_assign_to_channel = "MainCamera NI Trigger",
                 units = TimeUnits.SECONDS,
                 idle_state = Level.LOW,
                 initial_delay = delay,
