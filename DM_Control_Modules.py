@@ -25,7 +25,7 @@ def smoothed_sawtooth(fill = 0.95, cut_freq_low = None, cut_freq_high = None, si
     :return: normalized and smoothed sawtooth signal
     """
     if sig_freq is None: sig_freq = 640
-    if dm_sample_duration is None: dm_sample_duration = 5e-7# 6.67e-6
+    if dm_sample_duration is None: dm_sample_duration = 6.67e-6# 6.67e-6
     sig_length = int(np.ceil((1 / sig_freq) / dm_sample_duration))
     l1 = int(np.ceil(fill * sig_length)); l2 = sig_length - l1
     l1 = l1 + 1 + l1%2; l2 = l2 + 1 + l2%2

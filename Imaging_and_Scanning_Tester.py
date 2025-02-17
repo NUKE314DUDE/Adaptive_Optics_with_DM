@@ -16,8 +16,8 @@ os.chdir(current_directory)
 CONFIG = {
     "DM" : {
         "zernike_order" : 3,
-        "amp" : 0.95,
-        "signal_freq" : 60,
+        "amp" : 0.8,
+        "signal_freq" : 30,
         "sawtooth_params" : {
             "cut_freq_low" : 640,
             "cut_freq_high" : None,
@@ -29,11 +29,11 @@ CONFIG = {
         "subarray_mode" : 2.0,
         "subarray_size" : (1024, 1024),
         "sensor_mode" : 12.0,
-        "exposure_time" : 1, # ms
+        "exposure_time" : 0.01, # ms
         "trigger_source" : 2,
         "trigger_polarity" : 2,
-        "trigger_delay" : 8e-6,
-        "internal_line_interval" : 1*1e-6,
+        "trigger_delay" : 1e-6,
+        "internal_line_interval" : 1*1e-8,
         "auto_range" : False,
         "max_frame_rate" : 1000
     }
@@ -90,10 +90,10 @@ class DMCameraSync:
                                      int((CONFIG["camera"]["camera_size"] / 2 - CONFIG["camera"]["subarray_size"][1] / 2)))
             self.Camera.set_single_parameter("sensor_mode", CONFIG["camera"]["sensor_mode"])
             self.Camera.set_single_parameter("exposure_time",
-                                             min(CONFIG["camera"]["exposure_time"], (1/CONFIG["DM"]["signal_freq"]) - CONFIG["camera"]["trigger_delay"]
-                                                 - 4*1e-7))
+                                             min(CONFIG["camera"]["exposure_time"], 1e3 * ((1/CONFIG["DM"]["signal_freq"]) - CONFIG["camera"]["trigger_delay"]
+                                                 - 4*1e-7)))
 
-            if CONFIG["camera"]["exposure_time"] > ((1/CONFIG["DM"]["signal_freq"]) - CONFIG["camera"]["trigger_delay"]
+            if CONFIG["camera"]["exposure_time"] * 1e-3 > ((1/CONFIG["DM"]["signal_freq"]) - CONFIG["camera"]["trigger_delay"]
                                                  - 4*1e-7): print("Camera is missing triggers, lower the exposure!")
 
             self.Camera.set_single_parameter("trigger_source", CONFIG["camera"]["trigger_source"])
@@ -126,9 +126,9 @@ class DMCameraSync:
                         start_time = time.time()
 
                     try:
-                        self.frame_queue.get_nowait()
+                        # self.frame_queue.get_nowait()
                         self.frame_queue.put_nowait(frame)
-                    except queue.Empty:
+                    except queue.Full:
                         pass
 
                 time.sleep(1 / CONFIG["camera"]["max_frame_rate"])
@@ -143,7 +143,7 @@ class DMCameraSync:
 
     def update_display(self, frame):
         current_time = time.time()
-        print(f"Refresh gap = {current_time - self.last_update_time:.3f} s")
+        # print(f"Refresh gap = {current_time - self.last_update_time:.3f} s")
         self.last_update_time = current_time
         if frame is not None:
             self.last_frame = frame
@@ -203,7 +203,7 @@ class DMCameraSync:
             self.fig.canvas.flush_events()
             time.sleep(0.01)
 
-        dm_thread.join(); camera_thread.join()
+        monitor_thread.join(); dm_thread.join(); camera_thread.join()
         print("Resource released...")
 
     def _frame_generator(self):
@@ -211,7 +211,7 @@ class DMCameraSync:
         while self.running:
             try:
                 frame = self.frame_queue.get_nowait()
-                print(f"Frame grabbed with shape: {frame.shape}, data range: {np.min(frame)} to {np.max(frame)}")
+                # print(f"Frame grabbed with shape: {frame.shape}, data range: {np.min(frame)} to {np.max(frame)}")
                 yield frame
             except queue.Empty:
                 print("Frame Queue is empty.")
@@ -219,7 +219,7 @@ class DMCameraSync:
 
     def _thread_monitor(self, dm_thread = None, camera_thread = None):
         while self.running:
-            print(f"Thread status: DM[{dm_thread.is_alive}], Camera[{camera_thread.is_alive()}]")
+            print(f"Thread status: DM[{dm_thread.is_alive()}], Camera[{camera_thread.is_alive()}]")
             time.sleep(1)
 
 if __name__ == '__main__':
