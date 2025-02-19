@@ -12,6 +12,8 @@ from nidaqmx.errors import DaqError
 
 class MainCameraTrigger:
     def __init__(self):
+
+        self.NI_task = None
         self.NI_input_task = None
         self.NI_output_task = None
         self.NI_input = '/Dev1/pfi3'
@@ -23,44 +25,76 @@ class MainCameraTrigger:
         if DM_freq is None:
             DM_freq = 1e3
         try:
-            if self.NI_input_task or self.NI_output_task is not None:
-                self.NI_input_task.stop()
-                self.NI_input_task.close()
-                self.NI_input_task = None
-                self.NI_output_task.stop()
-                self.NI_output_task.close()
-                self.NI_output_task = None
+
+            if self.NI_task is not None:
+                self.NI_task.stop()
+                self.NI_task.cloes()
+                self.NI_task = None
 
             delay = min(max(delay, self.min_delay), min(self.max_delay, 1 / DM_freq))
+            if delay < self.min_delay or delay > self.max_delay: print("Trigger delay exceeding the bounaries!")
 
-            self.NI_input_task = nidaqmx.Task()
+            self.NI_task = nidaqmx.Task()
 
-            self.NI_input_task.di_channels.add_di_chan(
-                self.NI_input,
-                name_to_assign_to_lines = "DM Trigger Input"
-            )
-
-
-            self.NI_output_task = nidaqmx.Task()
-            self.NI_output_task.co_channels.add_co_pulse_chan_time(
-                counter = self.NI_output,
+            self.NI_task.co_channels.add_co_pulse_chan_freq(
+                self.NI_output,
                 name_to_assign_to_channel = "MainCamera NI Trigger",
-                units = TimeUnits.SECONDS,
+                freq = DM_freq,
+                duty_cycle = 0.5,
+                units = FrequencyUnits.HZ,
                 idle_state = Level.LOW,
-                initial_delay = delay,
-                low_time = 1e-7,
-                high_time = 1e-7
+                initial_delay = delay
             )
 
-            self.NI_output_task.triggers.start_trigger.cfg_dig_edge_start_trig(
-                trigger_source = self.NI_input,
-                trigger_edge = Slope.RISING
-            )
+            self.NI_task.timing.cfg_implicit_timing(samps_per_chan = 1,sample_mode = AcquisitionType.FINITE)
 
-            self.NI_output_task.triggers.start_trigger.retriggerable = True
+            self.NI_task.triggers.start_trigger.cfg_dig_edge_start_trig(self.NI_input,
+                                                                        trigger_edge = Slope.RISING)
 
-            self.NI_input_task.start()
-            self.NI_output_task.start()
+            self.NI_task.triggers.start_trigger.retriggerable = True
+
+            self.NI_task.start()
+
+            # if self.NI_input_task or self.NI_output_task is not None:
+            #     self.NI_input_task.stop()
+            #     self.NI_input_task.close()
+            #     self.NI_input_task = None
+            #     self.NI_output_task.stop()
+            #     self.NI_output_task.close()
+            #     self.NI_output_task = None
+            #
+            # delay = min(max(delay, self.min_delay), min(self.max_delay, 1 / DM_freq))
+            # if delay < self.min_delay or delay > self.max_delay: print("Trigger delay exceeding the bounaries!")
+            #
+            # self.NI_input_task = nidaqmx.Task()
+            #
+            # self.NI_input_task.di_channels.add_di_chan(
+            #     self.NI_input,
+            #     name_to_assign_to_lines = "DM Trigger Input"
+            # )
+            #
+            # self.NI_output_task = nidaqmx.Task()
+            # self.NI_output_task.co_channels.add_co_pulse_chan_time(
+            #     counter = self.NI_output,
+            #     name_to_assign_to_channel = "MainCamera NI Trigger",
+            #     units = TimeUnits.SECONDS,
+            #     idle_state = Level.LOW,
+            #     initial_delay = delay,
+            #     low_time = 1*1e-6,
+            #     high_time = 1*1e-6
+            # )
+            #
+            # self.NI_output_task.triggers.start_trigger.cfg_dig_edge_start_trig(
+            #     trigger_source = self.NI_input,
+            #     trigger_edge = Slope.RISING
+            # )
+            #
+            # # self.NI_output_task.timing.cfg_implicit_timing(samps_per_chan = 1)
+            #
+            # self.NI_output_task.triggers.start_trigger.retriggerable = True
+            #
+            # self.NI_input_task.start()
+            # self.NI_output_task.start()
 
         except DaqError as e:
             print(f'NI-DAQmx Error: {e}')
@@ -143,17 +177,17 @@ class MainCamera:
             self.camera["sensor_mode"] = sensor_mode
             self.camera["readout_speed"] = readout_speed
             self.camera["exposure_time"] = exposure_time
-            self.camera["trigger_source"] = trigger_source  #1
-            self.camera["trigger_polarity"] = trigger_polarity  #1
-            self.camera["subarray_mode"] = 1    #2
+            self.camera["trigger_source"] = trigger_source  # 1
+            self.camera["trigger_polarity"] = trigger_polarity  # 1
+            self.camera["subarray_mode"] = 1    # 2
             self.camera["subarray_hsize"] = h_size
             self.camera["subarray_vsize"] = v_size
-            self.camera["subarray_hpos"] = subarray_hpos    #512
+            self.camera["subarray_hpos"] = subarray_hpos
             self.camera["subarray_vpos"] = subarray_vpos
             self.camera["subarray_mode"] = subarray_mode
             self.frame_size = (v_size, h_size)
             self.camera["trigger_delay"] = trigger_delay
-            self.camera["internal_line_interval"] = internal_line_interval #9.74436090225564e-06*2
+            self.camera["internal_line_interval"] = internal_line_interval # Minimum 4.8676470588235295e-06
         except Exception as e:
             print(f"Error in set all parameters: {e}")
 
@@ -161,7 +195,7 @@ class MainCamera:
         try:
             return self.camera[parameter_name].read()
         except Exception as e:
-            print(f"Error in get single parameter: {e}")
+            print(f"Error in get single parameter \"{parameter_name}\": {e}")
             return None
 
     def get_single_parameter_limit(self, parameter_name):
@@ -169,7 +203,7 @@ class MainCamera:
             parameter = self.camera[parameter_name].read()
             return parameter["min_value"], parameter["max_value"]
         except Exception as e:
-            print(f"Error in get single parameter limit: {e}")
+            print(f"Error in get single parameter limit \"{parameter_name}\": {e}")
             return None, None
 
     def set_single_parameter(self, parameter_name, parameter_value):
@@ -180,7 +214,7 @@ class MainCamera:
             if parameter_name == "subarray_vsize":
                 self.frame_size = (self.frame_size[0], parameter_value)
         except Exception as e:
-            print(f"Error in set single parameter: {e}")
+            print(f"Error in set single parameter \"{parameter_name}\": {e}")
 
     def prepare_acquisition(self, number_of_frames = 10):
         try:
@@ -270,8 +304,9 @@ if __name__ == "__main__":
     main_cam.set_single_parameter("subarray_hpos", int((CAM_SIZE / 2 - IMG_SIZE[0] / 2)))
     main_cam.set_single_parameter("subarray_vpos", int((CAM_SIZE / 2 - IMG_SIZE[1] / 2)))
     main_cam.set_single_parameter("sensor_mode", 12.0)
-    main_cam.set_single_parameter("exposure_time", 10.0)
+    main_cam.set_single_parameter("exposure_time", 1*1e-3)
     main_cam.set_single_parameter("trigger_source", 1)
+    main_cam.set_single_parameter("internal_line_interval", 1*1e-6)
     main_cam.start_live()
 
     test_img = main_cam.get_last_live_frame()
@@ -295,7 +330,7 @@ if __name__ == "__main__":
 
     plt.ion()
     fig, ax = plt.subplots()
-    live_img = ax.imshow(frame)
+    live_img = ax.imshow(frame, cmap = "gray")
     plt.show()
     try:
         while not stopper.is_set():

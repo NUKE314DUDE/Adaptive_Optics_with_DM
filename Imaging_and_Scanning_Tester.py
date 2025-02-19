@@ -16,8 +16,8 @@ os.chdir(current_directory)
 CONFIG = {
     "DM" : {
         "zernike_order" : 3,
-        "amp" : 0.8,
-        "signal_freq" : 30,
+        "amp" : 0.9,
+        "signal_freq" : 100,
         "sawtooth_params" : {
             "cut_freq_low" : 640,
             "cut_freq_high" : None,
@@ -29,25 +29,27 @@ CONFIG = {
         "subarray_mode" : 2.0,
         "subarray_size" : (1024, 1024),
         "sensor_mode" : 12.0,
-        "exposure_time" : 0.01, # ms
+        "exposure_time" : 1*1e-5, # s
         "trigger_source" : 2,
         "trigger_polarity" : 2,
-        "trigger_delay" : 1e-6,
-        "internal_line_interval" : 1*1e-8,
-        "auto_range" : False,
+        "trigger_active" : 1,
+        "trigger_delay" : 8000000*1e-6,
+        "internal_line_interval" : 0.01*1e-6, # Minimum 4.8676470588235295e-06
+        "auto_range" : True,
         "max_frame_rate" : 1000
     }
 }
 
 class DMCameraSync:
     def __init__(self):
+
+        self.last_update_time = time.time()
         self.DM = AlPaoDM()
         self.Camera = MainCamera()
         self.CameraTrigger = MainCameraTrigger()
         self.running = False
         self.frame_queue = queue.Queue(maxsize = 4)
         self.last_frame = None
-        self.last_update_time = time.time()
         self.display_range = [0, 65535]
 
     def dm_control_thread(self, stop_event):
@@ -90,14 +92,15 @@ class DMCameraSync:
                                      int((CONFIG["camera"]["camera_size"] / 2 - CONFIG["camera"]["subarray_size"][1] / 2)))
             self.Camera.set_single_parameter("sensor_mode", CONFIG["camera"]["sensor_mode"])
             self.Camera.set_single_parameter("exposure_time",
-                                             min(CONFIG["camera"]["exposure_time"], 1e3 * ((1/CONFIG["DM"]["signal_freq"]) - CONFIG["camera"]["trigger_delay"]
+                                             min(CONFIG["camera"]["exposure_time"], ((1/CONFIG["DM"]["signal_freq"]) - CONFIG["camera"]["trigger_delay"]
                                                  - 4*1e-7)))
 
-            if CONFIG["camera"]["exposure_time"] * 1e-3 > ((1/CONFIG["DM"]["signal_freq"]) - CONFIG["camera"]["trigger_delay"]
+            if CONFIG["camera"]["exposure_time"] > ((1/CONFIG["DM"]["signal_freq"]) - CONFIG["camera"]["trigger_delay"]
                                                  - 4*1e-7): print("Camera is missing triggers, lower the exposure!")
 
             self.Camera.set_single_parameter("trigger_source", CONFIG["camera"]["trigger_source"])
             self.Camera.set_single_parameter("trigger_polarity", CONFIG["camera"]["trigger_polarity"])
+            self.Camera.set_single_parameter("trigger_active", CONFIG["camera"]["trigger_active"])
             self.Camera.set_single_parameter("internal_line_interval", CONFIG["camera"]["internal_line_interval"])
 
             self.CameraTrigger.start_trigger(CONFIG["camera"]["trigger_delay"], CONFIG["DM"]["signal_freq"])
@@ -111,6 +114,7 @@ class DMCameraSync:
             while not stop_event.is_set():
                 frame = self.Camera.get_last_live_frame()
                 if frame is not None:
+
                     if CONFIG["camera"]["auto_range"]:
 
                         frame_min = np.min(frame); frame_max = np.max(frame)
@@ -126,9 +130,9 @@ class DMCameraSync:
                         start_time = time.time()
 
                     try:
-                        # self.frame_queue.get_nowait()
                         self.frame_queue.put_nowait(frame)
                     except queue.Full:
+                        self.frame_queue.get_nowait()
                         pass
 
                 time.sleep(1 / CONFIG["camera"]["max_frame_rate"])
@@ -143,7 +147,7 @@ class DMCameraSync:
 
     def update_display(self, frame):
         current_time = time.time()
-        # print(f"Refresh gap = {current_time - self.last_update_time:.3f} s")
+        # print(f"Refresh gap = {current_time - self.last_update_time:.2f} s")
         self.last_update_time = current_time
         if frame is not None:
             self.last_frame = frame
