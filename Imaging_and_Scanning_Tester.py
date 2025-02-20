@@ -16,7 +16,7 @@ os.chdir(current_directory)
 CONFIG = {
     "DM" : {
         "zernike_order" : 3,
-        "amp" : 0.9,
+        "amp" : 1.,
         "signal_freq" : 100,
         "sawtooth_params" : {
             "cut_freq_low" : 640,
@@ -27,15 +27,15 @@ CONFIG = {
     "camera" : {
         "camera_size" : 2304,
         "subarray_mode" : 2.0,
-        "subarray_size" : (1024, 1024),
+        "subarray_size" : (512, 512),
         "sensor_mode" : 12.0,
-        "exposure_time" : 1*1e-5, # s
+        "exposure_time" : 100*1e-6, # s
         "trigger_source" : 2,
         "trigger_polarity" : 2,
         "trigger_active" : 1,
-        "trigger_delay" : 8000000*1e-6,
-        "internal_line_interval" : 0.01*1e-6, # Minimum 4.8676470588235295e-06
-        "auto_range" : True,
+        "trigger_delay" : 10*1e-6,
+        "internal_line_interval" : 10*1e-6, # Minimum 4.8676470588235295e-06
+        "auto_range" : False,
         "max_frame_rate" : 1000
     }
 }
@@ -65,7 +65,7 @@ class DMCameraSync:
             dm_sequence = np.zeros((27, len(amp_modulation)))
             dm_sequence[CONFIG["DM"]["zernike_order"]] = CONFIG["DM"]["amp"] * amp_modulation
 
-            self.DM.send_zernike_patterns(dm_sequence, repeat=0)
+            self.DM.send_zernike_patterns(dm_sequence, repeat = 0)
             print("DM sequence initiated...")
 
             while not stop_event.is_set():

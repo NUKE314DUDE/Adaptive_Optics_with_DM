@@ -25,10 +25,10 @@ def smoothed_sawtooth(fill = 0.95, cut_freq_low = None, cut_freq_high = None, si
     :return: normalized and smoothed sawtooth signal
     """
     if sig_freq is None: sig_freq = 640
-    if dm_sample_duration is None: dm_sample_duration = 6.67e-6 # 6.67e-6
+    if dm_sample_duration is None: dm_sample_duration = 6.667e-6 # 6.667e-6
     sig_length = int(np.ceil((1 / sig_freq) / dm_sample_duration))
     l1 = int(np.ceil(fill * sig_length)); l2 = sig_length - l1
-    l1 = l1 + 1 + l1%2; l2 = l2 + 1 + l2%2
+    l1 = 2 * l1 + 1; l2 = 2 * l2 + 1
     # defocus_seq = np.concatenate((np.linspace(-1.0, 1.0, l1),
     #                              np.linspace(1.0, -1.0, l2)))
     t1 = np.bartlett(l1)[: l1 // 2 + 1]
@@ -52,6 +52,7 @@ def alpao_loop_single(sequence_raw, stop_raw):
     lib.asdkInit.restype = ctypes.POINTER(ctypes.c_void_p)
     asdk_dm = lib.asdkInit(SN.encode("utf-8"))
     lib.asdkSet(asdk_dm, "daqFreq".encode("utf-8"), ctypes.c_double(20*1e6))
+    lib.asdkSet(asdk_dm, "NbSteps".encode("utf-8"), ctypes.c_double(2.0))
     lib.asdkSet(asdk_dm, "SyncMode".encode("utf-8"), ctypes.c_double(1.0))
     lib.asdkSet(asdk_dm, "TriggerMode".encode("utf-8"), ctypes.c_double(0))
 
@@ -69,6 +70,7 @@ def alpao_loop_single(sequence_raw, stop_raw):
                                    sequence.ctypes.data_as(ctypes.c_void_p),
                                    ctypes.c_uint32(1),
                                    ctypes.c_uint32(1))
+        # time.sleep(1*1e-6)
         if output!=0:
             lib.asdkPrintLastError()
 
@@ -91,6 +93,7 @@ def alpao_loop_sequence(sequence_raw, length_raw, repeats_raw, stop_raw, trigger
     lib.asdkInit.restype = ctypes.POINTER(ctypes.c_void_p)
     asdk_dm = lib.asdkInit(SN.encode("utf-8"))
     lib.asdkSet(asdk_dm, "daqFreq".encode("utf-8"), ctypes.c_double(20*1e6))
+    lib.asdkSet(asdk_dm, "NbSteps".encode("utf-8"), ctypes.c_double(2.0))
     lib.asdkSet(asdk_dm, "SyncMode".encode("utf-8"), ctypes.c_double(1.0))
     lib.asdkSet(asdk_dm, "Timeout".encode("utf-8"), ctypes.c_double(60.0))
     lib.asdkSet(asdk_dm, "TriggerIn".encode("utf-8"), ctypes.c_double(trigger_in))
@@ -103,6 +106,7 @@ def alpao_loop_sequence(sequence_raw, length_raw, repeats_raw, stop_raw, trigger
                                    sequence.ctypes.data_as(ctypes.c_void_p),
                                    ctypes.c_uint32(length[0]),
                                    ctypes.c_uint32(1))
+        # time.sleep(1*1e-6)
         if output!=0:
             lib.asdkPrintLastError()
 
