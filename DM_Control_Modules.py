@@ -169,7 +169,7 @@ class AlPaoDM:
 
     def update_zernike_patterns(self, zernike_orders):
         voltages = np.einsum('ij, ik -> jk', self.zern_to_volt, zernike_orders)
-        self.patterns[:, :] = np.array(voltages).T
+        self.patterns[:, :] = np.array(voltages + self.zero_compensation_voltage).T
 
     def start_direct_control(self):
         self.patterns_raw = mp.RawArray('d', DOF)

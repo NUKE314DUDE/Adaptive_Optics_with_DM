@@ -347,6 +347,13 @@ def coord_diff(ref_coord, test_coord, return_index = False):
         return np.array(matched_diff)
 
 def precise_coord(image, min_dis = 20, cog_scale = 0.5):
+    """
+    Directly find the precise positions of all centroids using center of mass
+    :param image:
+    :param min_dis:
+    :param cog_scale:
+    :return:
+    """
     pre_processed_img = img_threshold(gaussian_filter(image, sigma = 1))
     pixel_coord = extrema_coordinates_gradient(pre_processed_img)
     refined_coord = exclude_proxi_points(pixel_coord, min_dis)
@@ -354,6 +361,13 @@ def precise_coord(image, min_dis = 20, cog_scale = 0.5):
     return cog_coord
 
 def precise_coord_fixed_ref(image, refined_ref_coord, cog_scale = 0.5):
+    """
+    Calculate the precise positions of all centroids from test images with a reference grid
+    :param image:
+    :param refined_ref_coord:
+    :param cog_scale:
+    :return:
+    """
     pre_processed_img = img_threshold(gaussian_filter(image, sigma=1))
     cog_coord = center_of_gravity_with_coord(pre_processed_img, refined_ref_coord, cog_scale)
     return cog_coord
@@ -376,7 +390,7 @@ def deformable_mirror_random_test_input(test_range, test_length, degree_of_freed
 def deformable_mirror_single_probe_input(probe_ran, degree_of_freedom = 57):
     """
     Generate scan voltage set
-    :param probe_ran:
+    :param probe_ran: amplitude of each poke
     :param degree_of_freedom: DoF of the deformable mirror
     :return: an initial voltage (all zero) and a matrix of scan voltages
     """

@@ -46,6 +46,11 @@ def show_profile(profile, x_grid = None, y_grid = None):
     plt.ioff()
 
 def mean_gradient(image):
+    """
+    Calculate the average gradient of a 2D array
+    :param image:
+    :return: mean absolute gradient values
+    """
     image[np.isnan(image)] = 0
     gradient = np.gradient(np.array(image))
     abs_grad = np.sqrt(gradient[0]**2 + gradient[1]**2)

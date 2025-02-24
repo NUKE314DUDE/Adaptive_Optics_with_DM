@@ -22,6 +22,12 @@ class MainCameraTrigger:
         self.max_delay = 53.7
 
     def start_trigger(self, delay, DM_freq = None):
+        """
+        Activate the NI for triggering the main camera
+        :param delay: delay between DM action and camera action
+        :param DM_freq: sawtooth (or other patterns) freq
+        :return:
+        """
         if DM_freq is None:
             DM_freq = 60
         try:
