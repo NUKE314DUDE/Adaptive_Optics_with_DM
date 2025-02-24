@@ -16,12 +16,12 @@ os.chdir(current_directory)
 CONFIG = {
     "DM" : {
         "zernike_order" : 3,
-        "amp" : 1.,
-        "signal_freq" : 100,
+        "amp" : 0.9,
+        "signal_freq" : 60,
         "sawtooth_params" : {
             "cut_freq_low" : 640,
             "cut_freq_high" : None,
-            "fill" : 0.95
+            "fill" : 0.9
         }
     },
     "camera" : {
@@ -29,14 +29,14 @@ CONFIG = {
         "subarray_mode" : 2.0,
         "subarray_size" : (512, 512),
         "sensor_mode" : 12.0,
-        "exposure_time" : 100*1e-6, # s
+        "exposure_time" : 40*1e-6, # s
         "trigger_source" : 2,
         "trigger_polarity" : 2,
         "trigger_active" : 1,
-        "trigger_delay" : 10*1e-6,
-        "internal_line_interval" : 10*1e-6, # Minimum 4.8676470588235295e-06
-        "auto_range" : False,
-        "max_frame_rate" : 1000
+        "trigger_delay" : 1*1e-6,
+        "internal_line_interval" : 5*1e-6, # Minimum 4.8676470588235295e-06
+        "auto_range" : True,
+        "max_frame_rate" : 1000000
     }
 }
 
@@ -187,8 +187,8 @@ class DMCameraSync:
             self.fig,
             self.update_display,
             frames = self._frame_generator,
-            interval = 10, # ms
-            blit = True,
+            interval = 1, # ms
+            blit = False,
             cache_frame_data = False
         )
 
@@ -205,7 +205,7 @@ class DMCameraSync:
 
         while self.running:
             self.fig.canvas.flush_events()
-            time.sleep(0.01)
+            time.sleep(0.001)
 
         monitor_thread.join(); dm_thread.join(); camera_thread.join()
         print("Resource released...")
