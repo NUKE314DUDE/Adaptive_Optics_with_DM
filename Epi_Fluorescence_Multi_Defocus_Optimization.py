@@ -19,7 +19,7 @@ CONFIG = {
         "lhs_sampling": 160,
         "spgd_iter": 64,
         "spgd_gamma_init": 0.1,
-        "spga_gamma_decay": 0.01,
+        "spgd_gamma_decay": 0.01,
         "momentum_gamma": 0.05,
         "disturb_gamma": 0.5,
         "jumper_window": 8,
@@ -38,7 +38,7 @@ CONFIG = {
     "VISUALIZATION" : {
         "refresh_fps" : 20,
         "colormap" : "viridis",
-        "disp-range" : [0, 2**16 - 1],
+        "disp_range" : [0, 2**16 - 1],
         "max_metric_queue": 160
     }
 }
@@ -56,8 +56,6 @@ class EpiFluorescenceOptimization:
 
         self.defocus_amps = np.linspace(-CONFIG["OPTIMIZATION"]["defocus_amp"], CONFIG["OPTIMIZATION"]["defocus_amp"],
                                         CONFIG["OPTIMIZATION"]["defocus_steps"])
-        self.zernike_amps = np.linspace(-CONFIG["OPTIMIZATION"]["zernike_amp"], CONFIG["OPTIMIZATION"]["zernike_amp"],
-                                        CONFIG["OPTIMIZATION"]["zernike_steps"])
         self.zernike_indices = [idx for idx, _ in enumerate(input_zernike) if
                                 2 <= idx <= CONFIG["OPTIMIZATION"]["max_order"]  and idx != 3]
 
@@ -68,12 +66,12 @@ class EpiFluorescenceOptimization:
 
         plt.ion()
         self.live_fig, (ax1, ax2) = plt.subplots(1, 2, figsize = (10, 6.18))
-        self.live_fig.tight_layout()
+        self.live_fig.tight_layout(pad = 4)
 
         null_img = np.zeros(CONFIG["CAMERA"]["subarray_size"], dtype = np.uint16)
         img_1 = ax1.imshow(null_img, cmap = CONFIG["VISUALIZATION"]["colormap"],
                            vmin = CONFIG["VISUALIZATION"]["disp_range"][0],
-                           vmax = CONFIG["VISUALIZATION"]["disp_range"][1]) if not CONFIG["OPTIMIZATION"]["normalize_frame_data"] else ax1.imshow(null_img, cmap = CONFIG["VISUALIZATION"]["colormap"], vmin = -1, vmax = 1)
+                           vmax = CONFIG["VISUALIZATION"]["disp_range"][1]) if not CONFIG["OPTIMIZATION"]["normalize_frame"] else ax1.imshow(null_img, cmap = CONFIG["VISUALIZATION"]["colormap"], vmin = -1, vmax = 1)
 
         ax1.set_title("Camera Feed")
 
@@ -93,6 +91,7 @@ class EpiFluorescenceOptimization:
                 current_frame = self.frame_queue.get_nowait()
                 if CONFIG["OPTIMIZATION"]["normalize_frame"]:
                     current_frame = normalization(current_frame)
+                print(np.max(current_frame))
                 img_1.set_data(current_frame)
                 # img_1.autoscale()
 
@@ -123,7 +122,7 @@ class EpiFluorescenceOptimization:
                 self.metric_queue.get_nowait()
                 pass
 
-            if time.time() - last_update_time > 1/CONFIG["VISUALIZATION"][""]: # FPS
+            if time.time() - last_update_time > 1/CONFIG["VISUALIZATION"]["refresh_fps"]: # FPS
                 self.live_fig.canvas.flush_events()
                 last_update_time = time.time()
 
@@ -193,7 +192,7 @@ class EpiFluorescenceOptimization:
 
             full_coffs = np.zeros((len(input_zernike), 1))
             full_coffs[3] = defocus_amp
-            full_coffs[self.zernike_indices] = zern_coffs
+            full_coffs[self.zernike_indices] = zern_coffs.reshape(-1, 1)
 
             self.dm.send_direct_zernike(full_coffs)
             time.sleep(0.01)
@@ -216,7 +215,7 @@ class EpiFluorescenceOptimization:
         self._setup_camera()
         self.dm.start_direct_control()
 
-        live_thread = threading.Thread(target = self._live_feed_thread())
+        live_thread = threading.Thread(target = self._live_feed_thread)
         live_thread.daemon = True;live_thread.start()
 
         try:
@@ -226,7 +225,6 @@ class EpiFluorescenceOptimization:
                 defocus_carrier[3] = defocus_amp
 
                 self.dm.send_direct_zernike(defocus_carrier)
-
                 input(f"Now at defocus amp: {defocus_amp:.2f}, please refocus.")
 
                 lhs_guess = self._lhs_sampling(CONFIG["OPTIMIZATION"]["lhs_sampling"])
@@ -255,8 +253,8 @@ class EpiFluorescenceOptimization:
         finally:
             self.stop_event.set()
             live_thread.join()
-            time_stamp = datetime.now().strftime("%d/%m/%Y, %H:%M")
-            np.save(f"/Data_Deposit/{time_stamp}_optimum_coffs.npy", self.optim_data)
+            time_stamp = datetime.now().strftime("%d_%m_%Y_%H_%M")
+            np.save(f"C:\Xiong_Jianxuan\Python_Projects\Adaptive_Optics\Data_Deposit\\optimum_coffs_{str(time_stamp)}.npy", self.optim_data)
             print("Completed, releasing resources and saving data...")
             self.camera.camera_close()
             self.dm.stop_loop()
