@@ -29,8 +29,6 @@ def smoothed_sawtooth(fill = 0.95, cut_freq_low = None, cut_freq_high = None, si
     sig_length = int(np.ceil((1 / sig_freq) / dm_sample_duration))
     l1 = int(np.ceil(fill * sig_length)); l2 = sig_length - l1
     l1 = 2 * l1 + 1; l2 = 2 * l2 + 1
-    # defocus_seq = np.concatenate((np.linspace(-1.0, 1.0, l1),
-    #                              np.linspace(1.0, -1.0, l2)))
     t1 = np.bartlett(l1)[: l1 // 2 + 1]
     t2 = np.bartlett(l2)[l2 // 2 + 1:]
     defocus_seq = np.concatenate((t1, t2))
@@ -70,7 +68,6 @@ def alpao_loop_single(sequence_raw, stop_raw):
                                    sequence.ctypes.data_as(ctypes.c_void_p),
                                    ctypes.c_uint32(1),
                                    ctypes.c_uint32(1))
-        # time.sleep(1*1e-6)
         if output!=0:
             lib.asdkPrintLastError()
 
@@ -81,7 +78,6 @@ def alpao_loop_single(sequence_raw, stop_raw):
 def alpao_loop_sequence(sequence_raw, length_raw, repeats_raw, stop_raw, trigger_in = 0):
 
     length = np.frombuffer(length_raw, dtype="uint32")
-    # print(length.size)
     repeats = np.frombuffer(repeats_raw, dtype="uint32")
     stop = np.frombuffer(stop_raw, dtype="uint32")
     sequence = np.frombuffer(sequence_raw, dtype="float64").reshape((length[0], DOF))
@@ -106,7 +102,6 @@ def alpao_loop_sequence(sequence_raw, length_raw, repeats_raw, stop_raw, trigger
                                    sequence.ctypes.data_as(ctypes.c_void_p),
                                    ctypes.c_uint32(length[0]),
                                    ctypes.c_uint32(1))
-        # time.sleep(1*1e-6)
         if output!=0:
             lib.asdkPrintLastError()
 
@@ -146,8 +141,6 @@ class AlPaoDM:
 
     def send_voltage_patterns(self, voltages, repeat, trigger = 0):
         voltages += self.zero_compensation_voltage
-        # self.checker = voltages[:, 100]
-        # self.patterns_raw = mp.RawArray("d", voltages.shape[0]*DOF*np.dtype("float64").itemsize)
         self.patterns_raw = mp.RawArray("d", DOF * voltages.shape[1])
         self.length_raw = mp.RawArray("I", 1)
         self.repeat_raw = mp.RawArray("I", 1)
@@ -186,7 +179,7 @@ class AlPaoDM:
 
     def send_direct_zernike(self, zernike_orders):
         voltages = np.einsum('ij, ik -> jk', self.zern_to_volt, zernike_orders)
-        self.patterns[:, :] = np.array(voltages + self.zero_compensation_voltage).T
+        self.patterns = np.array(voltages + self.zero_compensation_voltage).T
 
     def stop_loop(self):
         if self.stop is not None:
